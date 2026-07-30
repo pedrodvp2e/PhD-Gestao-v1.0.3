@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme {
+  /* ===== Paleta — inspirada em prancha de projeto de obra (blueprint) ===== */
+  --color-blueprint-950: #0a1e3d;   /* navy quase preto — fundo do hero, "papel" do projeto */
+  --color-blueprint-900: #0f2a52;
+  --color-blueprint-700: #16407a;
+  --color-blueprint-line: #2f5a9e;  /* linhas de grade do blueprint */
+  --color-signal-500: #ff5a1f;      /* laranja de sinalização de obra — cor de destaque */
+  --color-signal-400: #ff7a45;
+  --color-concrete-100: #f4f2ee;    /* "papel" claro pras seções fora do hero */
+  --color-concrete-200: #e7e3db;
+  --color-concrete-400: #b8b2a4;
+  --color-concrete-700: #55524a;
+  --color-concrete-900: #221f1a;
+  --color-success: #00c896;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+
+  --font-display: 'Archivo Black', 'Barlow Condensed', sans-serif;
+  --font-heading: 'Barlow Condensed', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-concrete-100);
+  color: var(--color-concrete-900);
+}
+
+/* Respeita usuários que pedem menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Foco visível para navegação por teclado */
+:focus-visible {
+  outline: 2px solid var(--color-signal-500);
+  outline-offset: 2px;
+}
+
+/* ===== Fundo em grade de blueprint (o "papel de projeto") ===== */
+.blueprint-grid {
+  background-image:
+    linear-gradient(var(--color-blueprint-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-blueprint-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ===== Elemento-assinatura: carimbo de revisão de prancha ===== */
+.revision-stamp {
+  border: 2px solid currentColor;
+  position: relative;
+}
+.revision-stamp::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid currentColor;
+  opacity: 0.5;
+  pointer-events: none;
+}

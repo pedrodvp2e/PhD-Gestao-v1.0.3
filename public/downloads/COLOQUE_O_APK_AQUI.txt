@@ -1,0 +1,5 @@
+Coloque aqui o arquivo phd-gestoes.apk (build assinado gerado pelo Android Studio
+a partir do projeto do app mobile, via `npm run cap:sync` + build release).
+
+O botão de download da página /baixar já aponta para:
+/downloads/phd-gestoes.apk
