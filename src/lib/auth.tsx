@@ -75,13 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     if (error) return { error: error.message };
 
-<<<<<<< HEAD
     if (data.user) {
       // Cria o registro em profiles pra esse usuário (mesma tabela que o app mobile usa)
-=======
-    // Cria o registro em profiles pra esse usuário (mesma tabela que o app mobile usa)
-    if (data.user) {
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
       await supabase.from('profiles').upsert({
         id: data.user.id,
         full_name: fullName,

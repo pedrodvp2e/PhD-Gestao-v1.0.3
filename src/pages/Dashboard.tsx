@@ -15,24 +15,18 @@ import {
   MessageSquare,
   Gauge,
   AlertTriangle,
-<<<<<<< HEAD
   Clock,
   Sparkles,
   Layers,
   ChevronRight,
   HardHat,
   CheckCircle2,
-=======
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import NavBar from '@/components/NavBar';
-<<<<<<< HEAD
 import GlobalBackground from '@/components/GlobalBackground';
 import phdLogo from '@/assets/images/phd_app_logo_1785469467323.jpg';
-=======
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
 import { getProgressForecast } from '@/lib/progressForecast';
 import { getBudgetForecast } from '@/lib/budgetForecast';
 import { getMaterialDepletionForecast } from '@/lib/materialForecast';
@@ -131,7 +125,6 @@ type Payment = {
 };
 
 const TABS = [
-<<<<<<< HEAD
   { id: 'visao', label: 'Visão Geral', icon: Gauge, premium: false },
   { id: 'cronograma', label: 'Cronograma', icon: ListChecks, premium: false },
   { id: 'diario', label: 'Diário de Obra', icon: BookOpen, premium: false },
@@ -140,16 +133,6 @@ const TABS = [
   { id: 'equipe', label: 'Equipe', icon: Users, premium: false },
   { id: 'os', label: 'Ordens de Serviço', icon: FileText, premium: false },
   { id: 'chat', label: 'Chat da Obra', icon: MessageSquare, premium: false },
-=======
-  { id: 'visao', label: 'Visão geral', icon: Gauge, premium: false },
-  { id: 'cronograma', label: 'Cronograma', icon: ListChecks, premium: false },
-  { id: 'diario', label: 'Diário de obra', icon: BookOpen, premium: false },
-  { id: 'materiais', label: 'Materiais', icon: Package, premium: false },
-  { id: 'seguranca', label: 'Segurança', icon: ShieldAlert, premium: false },
-  { id: 'equipe', label: 'Equipe', icon: Users, premium: false },
-  { id: 'os', label: 'Ordens de serviço', icon: FileText, premium: false },
-  { id: 'chat', label: 'Chat da obra', icon: MessageSquare, premium: false },
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
   { id: 'financeiro', label: 'Financeiro', icon: Wallet, premium: true },
 ] as const;
 
@@ -162,7 +145,6 @@ const weatherLabel: Record<string, string> = {
   tempestade: '⛈️ Tempestade',
 };
 
-<<<<<<< HEAD
 const MOCK_PROJECTS: Project[] = [
   {
     id: 'proj-1',
@@ -251,24 +233,16 @@ const MOCK_PAYMENTS: Payment[] = [
   { id: 'p2', payee_name: 'Gerdau Aços', payee_type: 'Fornecedor', amount: 42000, due_date: '2026-08-10', paid_date: null, status: 'Pendente' },
 ];
 
-=======
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
 export default function Dashboard() {
   const { profile, isPremium } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-<<<<<<< HEAD
 
   const [tab, setTab] = useState<TabId>('visao');
   const [tabLoading, setTabLoading] = useState(false);
 
   // Estados dos dados da obra selecionada
-=======
-  const [tab, setTab] = useState<TabId>('visao');
-
-  // dados por aba — carregados sob demanda quando a aba/obra muda
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
   const [tasks, setTasks] = useState<Task[]>([]);
   const [diary, setDiary] = useState<DiaryEntry[]>([]);
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
@@ -281,7 +255,6 @@ export default function Dashboard() {
   const [budget, setBudget] = useState<BudgetItem[]>([]);
   const [cashFlow, setCashFlow] = useState<CashFlowEntry[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-<<<<<<< HEAD
 
   useEffect(() => {
     (async () => {
@@ -304,20 +277,6 @@ export default function Dashboard() {
 
       setProjects(loadedProjects);
       if (loadedProjects.length > 0) setSelectedId(loadedProjects[0].id);
-=======
-  const [tabLoading, setTabLoading] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, name, client_name, address, status, start_date, deadline, progress')
-        .order('created_at', { ascending: false });
-      if (!error && data) {
-        setProjects(data as Project[]);
-        if (data.length > 0) setSelectedId((data[0] as Project).id);
-      }
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
       setLoading(false);
     })();
   }, []);
@@ -328,7 +287,6 @@ export default function Dashboard() {
     (async () => {
       switch (tab) {
         case 'cronograma': {
-<<<<<<< HEAD
           let list: Task[] = [];
           try {
             const { data } = await supabase
@@ -460,100 +418,6 @@ export default function Dashboard() {
           setBudget(bList.length > 0 ? bList : MOCK_BUDGET);
           setCashFlow(cfList.length > 0 ? cfList : MOCK_CASH_FLOW);
           setPayments(payList.length > 0 ? payList : MOCK_PAYMENTS);
-=======
-          const { data } = await supabase
-            .from('tasks')
-            .select('id, title, category, status, progress, deadline')
-            .eq('project_id', selectedId)
-            .order('deadline', { ascending: true });
-          setTasks((data as Task[]) || []);
-          break;
-        }
-        case 'diario': {
-          const { data } = await supabase
-            .from('diary_entries')
-            .select('id, entry_date, weather, workers_count, description, occurrences')
-            .eq('project_id', selectedId)
-            .order('entry_date', { ascending: false });
-          setDiary((data as DiaryEntry[]) || []);
-          break;
-        }
-        case 'materiais': {
-          const [{ data: mats }, { data: snaps }] = await Promise.all([
-            supabase
-              .from('materials')
-              .select('id, name, unit, needed_quantity, acquired_quantity, notes')
-              .eq('project_id', selectedId),
-            supabase
-              .from('material_stock_snapshots')
-              .select('material_id, snapshot_date, acquired_quantity')
-              .eq('project_id', selectedId),
-          ]);
-          setMaterials((mats as MaterialRow[]) || []);
-          setStockSnapshots((snaps as MaterialStockSnapshot[]) || []);
-          break;
-        }
-        case 'seguranca': {
-          const [{ data: items }, { data: incs }] = await Promise.all([
-            supabase
-              .from('safety_checklist_items')
-              .select('id, label, completed')
-              .eq('project_id', selectedId),
-            supabase
-              .from('incidents')
-              .select('id, occurred_at, type, severity, description, injured_person, action_taken')
-              .eq('project_id', selectedId)
-              .order('occurred_at', { ascending: false }),
-          ]);
-          setSafetyItems((items as SafetyItem[]) || []);
-          setIncidents((incs as Incident[]) || []);
-          break;
-        }
-        case 'equipe': {
-          const { data } = await supabase
-            .from('project_members')
-            .select('id, project_role, profiles ( full_name, phone, member_code )')
-            .eq('project_id', selectedId);
-          setMembers((data as unknown as MemberRow[]) || []);
-          break;
-        }
-        case 'os': {
-          const { data } = await supabase
-            .from('service_orders')
-            .select('id, os_number, status, client_name, company_name, issued_at, deadline, labor_value')
-            .eq('project_id', selectedId)
-            .order('issued_at', { ascending: false });
-          setServiceOrders((data as ServiceOrder[]) || []);
-          break;
-        }
-        case 'chat': {
-          const { data } = await supabase
-            .from('messages')
-            .select('id, content, attachment_type, created_at, profiles ( full_name )')
-            .eq('project_id', selectedId)
-            .order('created_at', { ascending: false })
-            .limit(50);
-          setMessages((data as unknown as ChatMessage[]) || []);
-          break;
-        }
-        case 'financeiro': {
-          if (!isPremium) break;
-          const [{ data: b }, { data: cf }, { data: pay }] = await Promise.all([
-            supabase.from('budget_items').select('id, category, planned_value, actual_value').eq('project_id', selectedId),
-            supabase
-              .from('cash_flow')
-              .select('id, entry_date, type, description, amount')
-              .eq('project_id', selectedId)
-              .order('entry_date', { ascending: false }),
-            supabase
-              .from('payments')
-              .select('id, payee_name, payee_type, amount, due_date, paid_date, status')
-              .eq('project_id', selectedId),
-          ]);
-          setBudget((b as BudgetItem[]) || []);
-          setCashFlow((cf as CashFlowEntry[]) || []);
-          setPayments((pay as Payment[]) || []);
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
           break;
         }
       }
@@ -580,7 +444,6 @@ export default function Dashboard() {
   const currency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
-<<<<<<< HEAD
     <div className="min-h-screen bg-[#070d19] text-slate-100 font-sans relative overflow-hidden flex flex-col">
       <GlobalBackground />
 
@@ -675,82 +538,11 @@ export default function Dashboard() {
                   {TABS.map((t) => {
                     const Icon = t.icon;
                     const isActive = tab === t.id;
-=======
-    <div className="min-h-screen bg-concrete-100">
-      <NavBar />
-
-      <div className="max-w-6xl mx-auto px-5 py-10">
-        <h1 className="font-heading font-bold uppercase text-3xl">
-          Olá, {profile?.full_name?.split(' ')[0] || 'engenheiro'}
-        </h1>
-        <p className="text-sm text-concrete-700 mt-1">
-          Essa é a versão web do PHD Gestões — todas as áreas do app, num só lugar.
-        </p>
-
-        {!isPremium && (
-          <div className="mt-6 flex items-center justify-between gap-4 flex-wrap p-4 rounded-lg border border-signal-500/40 bg-signal-500/5">
-            <p className="text-sm font-medium text-blueprint-950">
-              Você está no plano Grátis — todas as áreas operacionais liberadas. O Financeiro completo é Premium.
-            </p>
-            <Link
-              to="/premium"
-              className="shrink-0 px-4 py-2 rounded-md bg-signal-500 text-white text-sm font-bold hover:bg-signal-400 transition-colors"
-            >
-              Liberar Premium
-            </Link>
-          </div>
-        )}
-
-        <div className="mt-10 grid md:grid-cols-[260px_1fr] gap-8">
-          {/* Lista de obras */}
-          <aside>
-            <h2 className="text-xs font-bold uppercase tracking-widest text-concrete-700 mb-3">Suas obras</h2>
-            {loading && <p className="text-sm text-concrete-400">Carregando…</p>}
-            {!loading && projects.length === 0 && (
-              <p className="text-sm text-concrete-400">
-                Nenhuma obra ainda. Crie uma pelo app mobile e ela aparece aqui também.
-              </p>
-            )}
-            <div className="space-y-2">
-              {projects.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedId(p.id)}
-                  className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                    selectedId === p.id
-                      ? 'border-signal-500 bg-white'
-                      : 'border-concrete-200 bg-white/50 hover:border-concrete-400'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Building2 size={15} className="text-signal-500 shrink-0" />
-                    <span className="font-semibold text-sm truncate">{p.name}</span>
-                  </div>
-                  <span className="text-xs text-concrete-700">{p.client_name}</span>
-                </button>
-              ))}
-            </div>
-          </aside>
-
-          {/* Conteúdo */}
-          <main>
-            {!selectedProject && !loading && (
-              <p className="text-sm text-concrete-400">Selecione uma obra na lista ao lado.</p>
-            )}
-
-            {selectedProject && (
-              <div className="space-y-6">
-                {/* Abas */}
-                <div className="flex flex-wrap gap-1.5 border-b border-concrete-200 pb-3">
-                  {TABS.map((t) => {
-                    const Icon = t.icon;
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
                     const locked = t.premium && !isPremium;
                     return (
                       <button
                         key={t.id}
                         onClick={() => setTab(t.id)}
-<<<<<<< HEAD
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${
                           isActive
                             ? 'bg-gradient-to-r from-signal-500 to-orange-500 text-white border-signal-400 shadow-md shadow-signal-500/20'
@@ -760,23 +552,11 @@ export default function Dashboard() {
                         <Icon className="w-3.5 h-3.5" />
                         <span>{t.label}</span>
                         {locked && <Lock className="w-3 h-3 text-amber-400 ml-0.5" />}
-=======
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-colors ${
-                          tab === t.id
-                            ? 'bg-blueprint-950 text-white'
-                            : 'bg-white border border-concrete-200 text-concrete-700 hover:border-concrete-400'
-                        }`}
-                      >
-                        <Icon size={13} />
-                        {t.label}
-                        {locked && <Lock size={11} className="text-signal-500" />}
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
                       </button>
                     );
                   })}
                 </div>
 
-<<<<<<< HEAD
                 {/* TAB CONTENT: VISÃO GERAL */}
                 {tab === 'visao' && (
                   <div className="space-y-6">
@@ -868,93 +648,12 @@ export default function Dashboard() {
                             </div>
                             <span className="text-xs font-mono font-bold text-slate-300">{t.progress}%</span>
                           </div>
-=======
-                {/* VISÃO GERAL */}
-                {tab === 'visao' && (
-                  <div className="p-6 rounded-lg border border-concrete-200 bg-white space-y-4">
-                    <h2 className="font-heading font-bold uppercase text-2xl">{selectedProject.name}</h2>
-                    <p className="text-sm text-concrete-700">
-                      {selectedProject.client_name} — {selectedProject.address}
-                    </p>
-                    <div>
-                      <div className="h-2 rounded-full bg-concrete-200 overflow-hidden">
-                        <div className="h-full bg-signal-500" style={{ width: `${selectedProject.progress ?? 0}%` }} />
-                      </div>
-                      <span className="text-xs font-mono text-concrete-700 mt-1.5 block">
-                        {selectedProject.progress ?? 0}% concluído — status: {selectedProject.status}
-                      </span>
-                    </div>
-
-                    {progressForecast && progressForecast.status !== 'sem_dados' && (
-                      <div
-                        className={`p-4 rounded-lg text-sm font-medium flex items-start gap-2 ${
-                          progressForecast.status === 'atrasado'
-                            ? 'bg-error/10 text-error'
-                            : progressForecast.status === 'atencao'
-                            ? 'bg-warning/10 text-warning'
-                            : 'bg-success/10 text-success'
-                        }`}
-                      >
-                        <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                        <span>
-                          No ritmo atual, a conclusão prevista é{' '}
-                          {progressForecast.projectedDate?.toLocaleDateString('pt-BR')}
-                          {progressForecast.delayDays !== null && progressForecast.delayDays > 0
-                            ? ` — cerca de ${progressForecast.delayDays} dia(s) de atraso em relação ao prazo.`
-                            : ' — dentro do prazo previsto.'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* CRONOGRAMA */}
-                {tab === 'cronograma' && (
-                  <div className="p-6 rounded-lg border border-concrete-200 bg-white">
-                    <h3 className="font-heading font-bold uppercase text-lg mb-4">Cronograma / Tarefas</h3>
-                    {tabLoading && <p className="text-sm text-concrete-400">Carregando…</p>}
-                    {!tabLoading && tasks.length === 0 && <p className="text-sm text-concrete-400">Nenhuma tarefa cadastrada.</p>}
-                    <div className="space-y-2">
-                      {tasks.map((t) => (
-                        <div key={t.id} className="p-3 rounded-lg bg-concrete-100 flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-semibold text-sm">{t.title}</p>
-                            <p className="text-xs text-concrete-700">
-                              {t.category || 'Sem categoria'} · {t.status} · {t.progress}%
-                              {t.deadline ? ` · prazo ${new Date(t.deadline).toLocaleDateString('pt-BR')}` : ''}
-                            </p>
-                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* DIÁRIO DE OBRA */}
-                {tab === 'diario' && (
-                  <div className="p-6 rounded-lg border border-concrete-200 bg-white">
-                    <h3 className="font-heading font-bold uppercase text-lg mb-4">Diário de obra</h3>
-                    {tabLoading && <p className="text-sm text-concrete-400">Carregando…</p>}
-                    {!tabLoading && diary.length === 0 && <p className="text-sm text-concrete-400">Nenhum registro de diário ainda.</p>}
-                    <div className="space-y-3">
-                      {diary.map((d) => (
-                        <div key={d.id} className="p-3 rounded-lg bg-concrete-100">
-                          <div className="flex items-center justify-between text-xs text-concrete-700 font-mono">
-                            <span>{new Date(d.entry_date).toLocaleDateString('pt-BR')}</span>
-                            <span>
-                              {weatherLabel[d.weather || ''] || ''} {d.workers_count ? `· ${d.workers_count} trabalhadores` : ''}
-                            </span>
-                          </div>
-                          <p className="text-sm mt-1">{d.description}</p>
-                          {d.occurrences && <p className="text-xs text-signal-500 mt-1">Ocorrências: {d.occurrences}</p>}
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-<<<<<<< HEAD
                 {/* TAB CONTENT: DIÁRIO DE OBRA */}
                 {tab === 'diario' && (
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
@@ -1003,39 +702,6 @@ export default function Dashboard() {
                                 {m.acquired_quantity} / {m.needed_quantity} {m.unit}
                               </span>
                             </div>
-=======
-                {/* MATERIAIS */}
-                {tab === 'materiais' && (
-                  <div className="p-6 rounded-lg border border-concrete-200 bg-white">
-                    <h3 className="font-heading font-bold uppercase text-lg mb-4">Materiais e estoque</h3>
-                    {tabLoading && <p className="text-sm text-concrete-400">Carregando…</p>}
-                    {!tabLoading && materials.length === 0 && <p className="text-sm text-concrete-400">Nenhum material cadastrado.</p>}
-                    <div className="space-y-2">
-                      {materials.map((m) => {
-                        const forecast = getMaterialDepletionForecast(
-                          stockSnapshots
-                            .filter((s) => s.material_id === m.id)
-                            .map((s) => ({ snapshot_date: s.snapshot_date, acquired_quantity: s.acquired_quantity }))
-                        );
-                        const low = m.acquired_quantity < m.needed_quantity;
-                        return (
-                          <div key={m.id} className="p-3 rounded-lg bg-concrete-100">
-                            <div className="flex items-center justify-between">
-                              <p className="font-semibold text-sm">{m.name}</p>
-                              <span className={`text-xs font-mono font-bold ${low ? 'text-error' : 'text-success'}`}>
-                                {m.acquired_quantity} / {m.needed_quantity} {m.unit}
-                              </span>
-                            </div>
-                            {forecast.status !== 'sem_dados' && forecast.daysToEmpty !== null && (
-                              <p
-                                className={`text-xs mt-1 ${
-                                  forecast.status === 'critico' || forecast.status === 'esgotado' ? 'text-error' : 'text-warning'
-                                }`}
-                              >
-                                Previsão de ruptura em {forecast.daysToEmpty} dia(s), no ritmo atual de consumo
-                              </p>
-                            )}
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
                           </div>
                         );
                       })}
@@ -1043,7 +709,6 @@ export default function Dashboard() {
                   </div>
                 )}
 
-<<<<<<< HEAD
                 {/* TAB CONTENT: SEGURANÇA */}
                 {tab === 'seguranca' && (
                   <div className="space-y-6">
@@ -1054,39 +719,6 @@ export default function Dashboard() {
                           <div key={s.id} className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-3 text-sm">
                             <CheckCircle2 className={`w-5 h-5 shrink-0 ${s.completed ? 'text-emerald-400' : 'text-slate-600'}`} />
                             <span className={s.completed ? 'text-slate-200' : 'text-slate-400'}>{s.label}</span>
-=======
-                {/* SEGURANÇA */}
-                {tab === 'seguranca' && (
-                  <div className="space-y-6">
-                    <div className="p-6 rounded-lg border border-concrete-200 bg-white">
-                      <h3 className="font-heading font-bold uppercase text-lg mb-4">Checklist de segurança</h3>
-                      {tabLoading && <p className="text-sm text-concrete-400">Carregando…</p>}
-                      <div className="grid sm:grid-cols-2 gap-2">
-                        {safetyItems.map((s) => (
-                          <div key={s.id} className="flex items-center gap-2 text-sm p-2 rounded-lg bg-concrete-100">
-                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${s.completed ? 'bg-success' : 'bg-error'}`} />
-                            {s.label}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="p-6 rounded-lg border border-concrete-200 bg-white">
-                      <h3 className="font-heading font-bold uppercase text-lg mb-4">Acidentes e ocorrências</h3>
-                      {!tabLoading && incidents.length === 0 && <p className="text-sm text-concrete-400">Nenhum incidente registrado.</p>}
-                      <div className="space-y-2">
-                        {incidents.map((i) => (
-                          <div key={i.id} className="p-3 rounded-lg bg-concrete-100">
-                            <div className="flex items-center justify-between text-xs font-mono text-concrete-700">
-                              <span>{new Date(i.occurred_at).toLocaleDateString('pt-BR')}</span>
-                              <span className="uppercase font-bold text-signal-500">
-                                {i.type} · {i.severity}
-                              </span>
-                            </div>
-                            <p className="text-sm mt-1">{i.description}</p>
-                            {i.injured_person && <p className="text-xs text-concrete-700 mt-1">Envolvido: {i.injured_person}</p>}
-                            {i.action_taken && <p className="text-xs text-concrete-700">Ação tomada: {i.action_taken}</p>}
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
                           </div>
                         ))}
                       </div>
@@ -1094,7 +726,6 @@ export default function Dashboard() {
                   </div>
                 )}
 
-<<<<<<< HEAD
                 {/* TAB CONTENT: EQUIPE */}
                 {tab === 'equipe' && (
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
@@ -1105,27 +736,12 @@ export default function Dashboard() {
                           <p className="font-bold text-white text-sm">{m.profiles?.full_name || 'Sem nome'}</p>
                           <p className="text-xs text-signal-400 font-mono font-semibold uppercase">{m.project_role}</p>
                           {m.profiles?.phone && <p className="text-xs text-slate-400">{m.profiles.phone}</p>}
-=======
-                {/* EQUIPE */}
-                {tab === 'equipe' && (
-                  <div className="p-6 rounded-lg border border-concrete-200 bg-white">
-                    <h3 className="font-heading font-bold uppercase text-lg mb-4">Equipe da obra</h3>
-                    {tabLoading && <p className="text-sm text-concrete-400">Carregando…</p>}
-                    {!tabLoading && members.length === 0 && <p className="text-sm text-concrete-400">Nenhum membro nessa obra.</p>}
-                    <div className="grid sm:grid-cols-2 gap-2">
-                      {members.map((m) => (
-                        <div key={m.id} className="p-3 rounded-lg bg-concrete-100">
-                          <p className="font-semibold text-sm">{m.profiles?.full_name || 'Sem nome'}</p>
-                          <p className="text-xs text-concrete-700 uppercase">{m.project_role}</p>
-                          {m.profiles?.phone && <p className="text-xs text-concrete-700">{m.profiles.phone}</p>}
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-<<<<<<< HEAD
                 {/* TAB CONTENT: ORDENS DE SERVIÇO */}
                 {tab === 'os' && (
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
@@ -1141,45 +757,6 @@ export default function Dashboard() {
                           </div>
                           <span className="px-3 py-1 rounded-full bg-signal-500/20 border border-signal-500/30 text-signal-300 text-xs font-mono font-bold uppercase self-start sm:self-auto">
                             {os.status}
-=======
-                {/* ORDENS DE SERVIÇO */}
-                {tab === 'os' && (
-                  <div className="p-6 rounded-lg border border-concrete-200 bg-white">
-                    <h3 className="font-heading font-bold uppercase text-lg mb-4">Ordens de serviço</h3>
-                    {tabLoading && <p className="text-sm text-concrete-400">Carregando…</p>}
-                    {!tabLoading && serviceOrders.length === 0 && <p className="text-sm text-concrete-400">Nenhuma OS emitida.</p>}
-                    <div className="space-y-2">
-                      {serviceOrders.map((os) => (
-                        <div key={os.id} className="p-3 rounded-lg bg-concrete-100 flex items-center justify-between gap-3 flex-wrap">
-                          <div>
-                            <p className="font-semibold text-sm">{os.os_number} — {os.client_name}</p>
-                            <p className="text-xs text-concrete-700">
-                              {os.company_name} · emitida em {new Date(os.issued_at).toLocaleDateString('pt-BR')}
-                              {os.deadline ? ` · prazo ${new Date(os.deadline).toLocaleDateString('pt-BR')}` : ''}
-                            </p>
-                          </div>
-                          <span className="text-xs font-mono font-bold uppercase text-signal-500">{os.status}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* CHAT */}
-                {tab === 'chat' && (
-                  <div className="p-6 rounded-lg border border-concrete-200 bg-white">
-                    <h3 className="font-heading font-bold uppercase text-lg mb-4">Chat da obra</h3>
-                    <p className="text-xs text-concrete-700 mb-4">Últimas mensagens (somente leitura no painel web).</p>
-                    {tabLoading && <p className="text-sm text-concrete-400">Carregando…</p>}
-                    {!tabLoading && messages.length === 0 && <p className="text-sm text-concrete-400">Nenhuma mensagem ainda.</p>}
-                    <div className="space-y-2 max-h-[28rem] overflow-y-auto">
-                      {[...messages].reverse().map((m) => (
-                        <div key={m.id} className="p-2.5 rounded-lg bg-concrete-100 text-sm">
-                          <span className="font-bold">{m.profiles?.full_name || 'Alguém'}: </span>
-                          {m.content ? m.content : m.attachment_type === 'audio' ? '🎤 áudio (ver no app)' : '📷 imagem (ver no app)'}
-                          <span className="block text-[10px] font-mono text-concrete-700 mt-0.5">
-                            {new Date(m.created_at).toLocaleString('pt-BR')}
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
                           </span>
                         </div>
                       ))}
@@ -1187,7 +764,6 @@ export default function Dashboard() {
                   </div>
                 )}
 
-<<<<<<< HEAD
                 {/* TAB CONTENT: CHAT DA OBRA */}
                 {tab === 'chat' && (
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
@@ -1230,31 +806,10 @@ export default function Dashboard() {
                           className="px-6 py-3 rounded-xl bg-signal-500 hover:bg-signal-400 text-white font-extrabold text-sm shadow-xl shadow-signal-500/25 transition-all"
                         >
                           Conhecer Plano Premium
-=======
-                {/* FINANCEIRO — PREMIUM */}
-                {tab === 'financeiro' && (
-                  <div className="relative p-6 rounded-lg border border-concrete-200 bg-white space-y-6">
-                    <h3 className="font-heading font-bold uppercase text-lg flex items-center gap-2">
-                      <Wallet size={18} className="text-signal-500" /> Financeiro
-                    </h3>
-
-                    {!isPremium && (
-                      <div className="absolute inset-0 rounded-lg bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3 text-center px-6 z-10">
-                        <Lock size={22} className="text-blueprint-950" />
-                        <p className="text-sm font-semibold text-blueprint-950 max-w-xs">
-                          Orçamento, fluxo de caixa, pagamentos e previsão de estouro ficam disponíveis no plano Premium.
-                        </p>
-                        <Link
-                          to="/premium"
-                          className="px-4 py-2 rounded-md bg-signal-500 text-white text-sm font-bold hover:bg-signal-400 transition-colors"
-                        >
-                          Ver plano Premium
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
                         </Link>
                       </div>
                     )}
 
-<<<<<<< HEAD
                     <div className={!isPremium ? 'opacity-20 pointer-events-none space-y-6' : 'space-y-6'}>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
@@ -1275,83 +830,6 @@ export default function Dashboard() {
                               <span>{c.description}</span>
                               <span className={`font-bold ${c.type === 'entrada' ? 'text-emerald-400' : 'text-rose-400'}`}>
                                 {c.type === 'entrada' ? '+' : '-'} {currency(c.amount)}
-=======
-                    <div className={!isPremium ? 'opacity-30 select-none pointer-events-none space-y-6' : 'space-y-6'}>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 rounded-lg bg-concrete-100">
-                          <span className="text-xs font-bold uppercase text-concrete-700 flex items-center gap-1">
-                            <TrendingUp size={13} /> Orçado
-                          </span>
-                          <span className="block font-mono font-bold text-xl mt-1">{currency(totalPlanned)}</span>
-                        </div>
-                        <div className="p-4 rounded-lg bg-concrete-100">
-                          <span className="text-xs font-bold uppercase text-concrete-700 flex items-center gap-1">
-                            <TrendingDown size={13} /> Realizado
-                          </span>
-                          <span className="block font-mono font-bold text-xl mt-1">{currency(totalActual)}</span>
-                        </div>
-                      </div>
-
-                      {budgetForecast.status !== 'sem_dados' && (
-                        <div
-                          className={`p-4 rounded-lg text-sm font-medium flex items-start gap-2 ${
-                            budgetForecast.status === 'estourado' || budgetForecast.status === 'critico'
-                              ? 'bg-error/10 text-error'
-                              : budgetForecast.status === 'atencao'
-                              ? 'bg-warning/10 text-warning'
-                              : 'bg-success/10 text-success'
-                          }`}
-                        >
-                          <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                          <span>
-                            {budgetForecast.status === 'estourado'
-                              ? 'O orçamento planejado já foi ultrapassado.'
-                              : budgetForecast.daysToRupture !== null
-                              ? `No ritmo de gasto atual, o orçamento estoura em ~${budgetForecast.daysToRupture} dia(s).`
-                              : 'Ritmo de gasto controlado.'}
-                          </span>
-                        </div>
-                      )}
-
-                      <div>
-                        <h4 className="text-xs font-bold uppercase tracking-widest text-concrete-700 mb-2">Fluxo de caixa</h4>
-                        <div className="grid grid-cols-2 gap-4 mb-3">
-                          <div className="p-3 rounded-lg bg-concrete-100">
-                            <span className="text-xs text-concrete-700">Entradas</span>
-                            <span className="block font-mono font-bold text-success">{currency(totalEntradas)}</span>
-                          </div>
-                          <div className="p-3 rounded-lg bg-concrete-100">
-                            <span className="text-xs text-concrete-700">Saídas</span>
-                            <span className="block font-mono font-bold text-error">{currency(totalSaidas)}</span>
-                          </div>
-                        </div>
-                        <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                          {cashFlow.map((c) => (
-                            <div key={c.id} className="flex items-center justify-between text-xs p-2 rounded bg-concrete-100">
-                              <span>
-                                {new Date(c.entry_date).toLocaleDateString('pt-BR')} — {c.description}
-                              </span>
-                              <span className={`font-mono font-bold ${c.type === 'entrada' ? 'text-success' : 'text-error'}`}>
-                                {c.type === 'entrada' ? '+' : '-'}
-                                {currency(c.amount)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="text-xs font-bold uppercase tracking-widest text-concrete-700 mb-2">Pagamentos</h4>
-                        {payments.length === 0 && <p className="text-xs text-concrete-400">Nenhum pagamento cadastrado.</p>}
-                        <div className="space-y-1.5">
-                          {payments.map((p) => (
-                            <div key={p.id} className="flex items-center justify-between text-xs p-2 rounded bg-concrete-100">
-                              <span>
-                                {p.payee_name} ({p.payee_type})
-                              </span>
-                              <span className="font-mono font-bold">
-                                {currency(p.amount)} · {p.status}
->>>>>>> 81e650ff911497f9aa49347baba54842db56952b
                               </span>
                             </div>
                           ))}
