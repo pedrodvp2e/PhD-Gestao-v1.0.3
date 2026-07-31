@@ -21,6 +21,12 @@ import {
   ChevronRight,
   HardHat,
   CheckCircle2,
+  Plus,
+  X,
+  Send,
+  UserPlus,
+  Search,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -123,6 +129,54 @@ type Payment = {
   paid_date: string | null;
   status: string;
 };
+
+// ==========================================
+// UI HELPERS (mesmo padrão visual do site: vidro fosco escuro)
+// ==========================================
+
+const inputClass =
+  'w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-signal-500';
+const labelClass = 'text-xs font-mono font-bold text-slate-300';
+
+function Modal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={onClose} />
+      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-blueprint-900/95 border border-white/15 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5">
+        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+          <h3 className="text-lg font-extrabold text-white">{title}</h3>
+          <button onClick={onClose} className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SubmitButton({ loading, children }: { loading: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      type="submit"
+      disabled={loading}
+      className="w-full py-3.5 rounded-xl bg-signal-500 hover:bg-signal-400 disabled:opacity-60 text-white font-extrabold text-sm shadow-xl shadow-signal-500/20 transition-all flex items-center justify-center gap-2"
+    >
+      {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+      <span>{children}</span>
+    </button>
+  );
+}
+
+const MATERIAL_UNITS = ['un', 'kg', 'm3', 'm2', 'lt', 'saco', 'm', 'mm'];
 
 const TABS = [
   { id: 'visao', label: 'Visão Geral', icon: Gauge, premium: false },
@@ -234,7 +288,7 @@ const MOCK_PAYMENTS: Payment[] = [
 ];
 
 export default function Dashboard() {
-  const { profile, isPremium } = useAuth();
+  const { profile, isPremium, user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -255,6 +309,64 @@ export default function Dashboard() {
   const [budget, setBudget] = useState<BudgetItem[]>([]);
   const [cashFlow, setCashFlow] = useState<CashFlowEntry[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+
+  // Dispara um novo carregamento dos dados da aba atual
+  const [refreshTick, setRefreshTick] = useState(0);
+  const refresh = () => setRefreshTick((v) => v + 1);
+
+  // Modais de criação/edição (uma função pra cada, igual ao app mobile)
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [showNewDiary, setShowNewDiary] = useState(false);
+  const [showNewMaterial, setShowNewMaterial] = useState(false);
+  const [showNewIncident, setShowNewIncident] = useState(false);
+  const [showInviteMember, setShowInviteMember] = useState(false);
+  const [showNewOS, setShowNewOS] = useState(false);
+  const [showNewBudgetItem, setShowNewBudgetItem] = useState(false);
+  const [showNewCashFlow, setShowNewCashFlow] = useState(false);
+  const [showNewPayment, setShowNewPayment] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  const [projectForm, setProjectForm] = useState({ name: '', client_name: '', address: '', deadline: '' });
+  const [taskForm, setTaskForm] = useState({ title: '', category: '', deadline: '' });
+  const [diaryForm, setDiaryForm] = useState({
+    entry_date: new Date().toISOString().slice(0, 10),
+    weather: 'sol',
+    workers_count: '',
+    description: '',
+    occurrences: '',
+  });
+  const [materialForm, setMaterialForm] = useState({ name: '', unit: 'un', needed_quantity: '', acquired_quantity: '', notes: '' });
+  const [incidentForm, setIncidentForm] = useState({
+    occurred_at: new Date().toISOString().slice(0, 10),
+    type: 'ocorrencia',
+    severity: 'leve',
+    description: '',
+    injured_person: '',
+    action_taken: '',
+  });
+  const [memberSearch, setMemberSearch] = useState('');
+  const [foundMember, setFoundMember] = useState<{ id: string; full_name: string; role: string; member_code: string } | null>(null);
+  const [memberSearchError, setMemberSearchError] = useState('');
+  const [osForm, setOsForm] = useState({
+    company_name: '',
+    client_name: '',
+    client_phone: '',
+    deadline: '',
+    problem_description: '',
+    execution_description: '',
+    labor_value: '',
+  });
+  const [budgetItemForm, setBudgetItemForm] = useState({ category: '', planned_value: '', actual_value: '' });
+  const [cashFlowForm, setCashFlowForm] = useState({
+    type: 'saida' as 'entrada' | 'saida',
+    entry_date: new Date().toISOString().slice(0, 10),
+    description: '',
+    amount: '',
+  });
+  const [paymentForm, setPaymentForm] = useState({ payee_name: '', payee_type: 'Fornecedor', amount: '', due_date: '' });
+  const [chatInput, setChatInput] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -423,7 +535,7 @@ export default function Dashboard() {
       }
       setTabLoading(false);
     })();
-  }, [tab, selectedId, isPremium]);
+  }, [tab, selectedId, isPremium, refreshTick]);
 
   const selectedProject = projects.find((p) => p.id === selectedId) || null;
   const totalPlanned = budget.reduce((s, b) => s + (b.planned_value || 0), 0);
@@ -442,6 +554,347 @@ export default function Dashboard() {
   );
 
   const currency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  // ==========================================
+  // HANDLERS: CRIAÇÃO / EDIÇÃO (espelham o app mobile)
+  // ==========================================
+
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!projectForm.name.trim() || !profile) return;
+    setFormLoading(true);
+    setFormError('');
+    try {
+      const { data: inserted, error } = await supabase
+        .from('projects')
+        .insert({
+          name: projectForm.name.trim(),
+          client_name: projectForm.client_name.trim() || null,
+          address: projectForm.address.trim() || null,
+          status: 'planejamento',
+          start_date: new Date().toISOString().split('T')[0],
+          deadline: projectForm.deadline || null,
+          progress: 0,
+          created_by: profile.id,
+        })
+        .select()
+        .single();
+      if (error || !inserted) throw new Error(error?.message || 'Não foi possível criar a obra.');
+
+      const { error: memberError } = await supabase
+        .from('project_members')
+        .insert({ project_id: inserted.id, user_id: profile.id, project_role: profile.role });
+      if (memberError) throw new Error(memberError.message);
+
+      setProjects((prev) => [inserted as Project, ...prev]);
+      setSelectedId(inserted.id);
+      setProjectForm({ name: '', client_name: '', address: '', deadline: '' });
+      setShowNewProject(false);
+    } catch (err: any) {
+      setFormError(err?.message || 'Erro ao criar a obra.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskForm.title.trim() || !selectedId) return;
+    setFormLoading(true);
+    setFormError('');
+    try {
+      const { error } = await supabase.from('tasks').insert({
+        project_id: selectedId,
+        title: taskForm.title.trim(),
+        category: taskForm.category.trim() || 'Serviço',
+        status: 'pendente',
+        progress: 0,
+        start_date: new Date().toISOString().split('T')[0],
+        deadline: taskForm.deadline || null,
+        created_by: profile?.id || null,
+      });
+      if (error) throw new Error(error.message);
+      setTaskForm({ title: '', category: '', deadline: '' });
+      setShowNewTask(false);
+      refresh();
+    } catch (err: any) {
+      setFormError(err?.message || 'Erro ao criar a tarefa.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleUpdateTask = async (id: string, patch: Partial<Task>) => {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+    await supabase.from('tasks').update(patch).eq('id', id);
+  };
+
+  const handleCreateDiary = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!diaryForm.description.trim() || !selectedId) return;
+    setFormLoading(true);
+    setFormError('');
+    try {
+      const { error } = await supabase.from('diary_entries').insert({
+        project_id: selectedId,
+        entry_date: diaryForm.entry_date,
+        weather: diaryForm.weather,
+        workers_count: Number(diaryForm.workers_count) || null,
+        description: diaryForm.description.trim(),
+        occurrences: diaryForm.occurrences.trim() || null,
+        created_by: profile?.id || null,
+      });
+      if (error) throw new Error(error.message);
+      setDiaryForm({ entry_date: new Date().toISOString().slice(0, 10), weather: 'sol', workers_count: '', description: '', occurrences: '' });
+      setShowNewDiary(false);
+      refresh();
+    } catch (err: any) {
+      setFormError(err?.message || 'Erro ao registrar o diário.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleCreateMaterial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!materialForm.name.trim() || !selectedId) return;
+    setFormLoading(true);
+    setFormError('');
+    try {
+      const { error } = await supabase.from('materials').insert({
+        project_id: selectedId,
+        name: materialForm.name.trim(),
+        unit: materialForm.unit,
+        needed_quantity: Number(materialForm.needed_quantity) || 1,
+        acquired_quantity: Number(materialForm.acquired_quantity) || 0,
+        notes: materialForm.notes.trim() || null,
+        created_by: profile?.id || null,
+      });
+      if (error) throw new Error(error.message);
+      setMaterialForm({ name: '', unit: 'un', needed_quantity: '', acquired_quantity: '', notes: '' });
+      setShowNewMaterial(false);
+      refresh();
+    } catch (err: any) {
+      setFormError(err?.message || 'Erro ao criar o suprimento.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleRestockMaterial = async (m: MaterialRow, delta: number) => {
+    const nextQty = Math.max(0, m.acquired_quantity + delta);
+    setMaterials((prev) => prev.map((mat) => (mat.id === m.id ? { ...mat, acquired_quantity: nextQty } : mat)));
+    await supabase.from('materials').update({ acquired_quantity: nextQty }).eq('id', m.id);
+  };
+
+  const handleToggleSafetyItem = async (item: SafetyItem) => {
+    const next = !item.completed;
+    setSafetyItems((prev) => prev.map((s) => (s.id === item.id ? { ...s, completed: next } : s)));
+    await supabase
+      .from('safety_checklist_items')
+      .update({ completed: next, checked_by: profile?.id || null, checked_at: next ? new Date().toISOString() : null })
+      .eq('id', item.id);
+  };
+
+  const handleCreateIncident = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!incidentForm.description.trim() || !selectedId) return;
+    setFormLoading(true);
+    setFormError('');
+    try {
+      const { error } = await supabase.from('incidents').insert({
+        project_id: selectedId,
+        occurred_at: incidentForm.occurred_at,
+        type: incidentForm.type,
+        severity: incidentForm.severity,
+        description: incidentForm.description.trim(),
+        injured_person: incidentForm.injured_person.trim() || null,
+        action_taken: incidentForm.action_taken.trim() || null,
+        created_by: profile?.id || null,
+      });
+      if (error) throw new Error(error.message);
+      setIncidentForm({ occurred_at: new Date().toISOString().slice(0, 10), type: 'ocorrencia', severity: 'leve', description: '', injured_person: '', action_taken: '' });
+      setShowNewIncident(false);
+      refresh();
+    } catch (err: any) {
+      setFormError(err?.message || 'Erro ao registrar a ocorrência.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleSearchMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMemberSearchError('');
+    setFoundMember(null);
+    if (!memberSearch.trim()) return;
+    setFormLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('find_profile_by_code_or_phone', { p_search: memberSearch.trim() });
+      if (error) throw new Error(error.message);
+      if (data && data.length > 0) setFoundMember(data[0]);
+      else setMemberSearchError('Nenhuma conta encontrada com esse código ou telefone.');
+    } catch (err: any) {
+      setMemberSearchError(err?.message || 'Não foi possível buscar.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleInviteMember = async () => {
+    if (!foundMember || !selectedId) return;
+    setFormLoading(true);
+    setFormError('');
+    try {
+      const { data: existing } = await supabase
+        .from('project_members')
+        .select('id')
+        .eq('project_id', selectedId)
+        .eq('user_id', foundMember.id)
+        .maybeSingle();
+      if (existing) throw new Error('Este colaborador já faz parte da equipe desta obra.');
+
+      const { error } = await supabase
+        .from('project_members')
+        .insert({ project_id: selectedId, user_id: foundMember.id, project_role: foundMember.role || 'funcionario' });
+      if (error) throw new Error(error.message);
+
+      setMemberSearch('');
+      setFoundMember(null);
+      setShowInviteMember(false);
+      refresh();
+    } catch (err: any) {
+      setFormError(err?.message || 'Erro ao adicionar colaborador.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleCreateServiceOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!osForm.client_name.trim() || !selectedId) return;
+    setFormLoading(true);
+    setFormError('');
+    try {
+      const year = new Date().getFullYear();
+      const existingThisYear = serviceOrders.filter((o) => o.os_number.includes(`-${year}-`));
+      const osNumber = `OS-${year}-${String(existingThisYear.length + 1).padStart(4, '0')}`;
+
+      const { error } = await supabase.from('service_orders').insert({
+        project_id: selectedId,
+        os_number: osNumber,
+        issued_at: new Date().toISOString(),
+        deadline: osForm.deadline || null,
+        company_name: osForm.company_name.trim(),
+        client_name: osForm.client_name.trim(),
+        client_phone: osForm.client_phone.trim() || null,
+        problem_description: osForm.problem_description.trim() || null,
+        execution_description: osForm.execution_description.trim() || null,
+        labor_value: Number(osForm.labor_value) || 0,
+        status: 'aberta',
+        created_by: profile?.id || null,
+      });
+      if (error) throw new Error(error.message);
+      setOsForm({ company_name: '', client_name: '', client_phone: '', deadline: '', problem_description: '', execution_description: '', labor_value: '' });
+      setShowNewOS(false);
+      refresh();
+    } catch (err: any) {
+      setFormError(err?.message || 'Erro ao criar a OS.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || !selectedId || !user) return;
+    const content = chatInput.trim();
+    setChatInput('');
+    const optimistic: ChatMessage = {
+      id: `tmp-${Date.now()}`,
+      content,
+      attachment_type: null,
+      created_at: new Date().toISOString(),
+      profiles: { full_name: profile?.full_name || 'Você' },
+    };
+    setMessages((prev) => [optimistic, ...prev]);
+    await supabase.from('messages').insert({ project_id: selectedId, user_id: user.id, content });
+  };
+
+  const handleCreateBudgetItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!budgetItemForm.category.trim() || !selectedId) return;
+    setFormLoading(true);
+    setFormError('');
+    try {
+      const { error } = await supabase.from('budget_items').insert({
+        project_id: selectedId,
+        category: budgetItemForm.category.trim(),
+        planned_value: Number(budgetItemForm.planned_value) || 0,
+        actual_value: Number(budgetItemForm.actual_value) || 0,
+        created_by: profile?.id || null,
+      });
+      if (error) throw new Error(error.message);
+      setBudgetItemForm({ category: '', planned_value: '', actual_value: '' });
+      setShowNewBudgetItem(false);
+      refresh();
+    } catch (err: any) {
+      setFormError(err?.message || 'Erro ao salvar a categoria.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleCreateCashFlow = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cashFlowForm.description.trim() || !cashFlowForm.amount || !selectedId) return;
+    setFormLoading(true);
+    setFormError('');
+    try {
+      const { error } = await supabase.from('cash_flow').insert({
+        project_id: selectedId,
+        entry_date: cashFlowForm.entry_date,
+        type: cashFlowForm.type,
+        description: cashFlowForm.description.trim(),
+        amount: Number(cashFlowForm.amount) || 0,
+        created_by: profile?.id || null,
+      });
+      if (error) throw new Error(error.message);
+      setCashFlowForm({ type: 'saida', entry_date: new Date().toISOString().slice(0, 10), description: '', amount: '' });
+      setShowNewCashFlow(false);
+      refresh();
+    } catch (err: any) {
+      setFormError(err?.message || 'Erro ao salvar o lançamento.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleCreatePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paymentForm.payee_name.trim() || !selectedId) return;
+    setFormLoading(true);
+    setFormError('');
+    try {
+      const { error } = await supabase.from('payments').insert({
+        project_id: selectedId,
+        payee_name: paymentForm.payee_name.trim(),
+        payee_type: paymentForm.payee_type,
+        amount: Number(paymentForm.amount) || 0,
+        due_date: paymentForm.due_date || null,
+        status: 'Pendente',
+        created_by: profile?.id || null,
+      });
+      if (error) throw new Error(error.message);
+      setPaymentForm({ payee_name: '', payee_type: 'Fornecedor', amount: '', due_date: '' });
+      setShowNewPayment(false);
+      refresh();
+    } catch (err: any) {
+      setFormError(err?.message || 'Erro ao registrar o pagamento.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#070d19] text-slate-100 font-sans relative overflow-hidden flex flex-col">
@@ -490,10 +943,17 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Aside: Selected Projects */}
           <aside className="lg:col-span-3 space-y-4">
-            <div className="flex items-center justify-between px-1">
+            <div className="flex items-center justify-between px-1 gap-2">
               <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">
                 Obras Cadastradas ({projects.length})
               </span>
+              <button
+                onClick={() => setShowNewProject(true)}
+                title="Cadastrar nova obra"
+                className="shrink-0 p-1.5 rounded-lg bg-signal-500/20 border border-signal-500/30 text-signal-400 hover:bg-signal-500/30 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
             </div>
 
             {loading && (
@@ -622,7 +1082,16 @@ export default function Dashboard() {
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-xl font-bold text-white">Cronograma Físico de Tarefas</h3>
-                      <span className="text-xs font-mono text-slate-400">{tasks.length} Tarefas</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-mono text-slate-400">{tasks.length} Tarefas</span>
+                        <button
+                          onClick={() => setShowNewTask(true)}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-signal-500 hover:bg-signal-400 text-white text-xs font-extrabold transition-all"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Nova Tarefa</span>
+                        </button>
+                      </div>
                     </div>
 
                     {tabLoading && <p className="text-sm text-slate-400">Carregando tarefas…</p>}
@@ -637,16 +1106,30 @@ export default function Dashboard() {
                               <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 text-[10px] font-mono">
                                 {t.category || 'Geral'}
                               </span>
-                              <span className="px-2.5 py-0.5 rounded-full bg-signal-500/20 text-signal-300 border border-signal-500/30 text-[10px] font-mono font-bold">
-                                {t.status}
-                              </span>
+                              <select
+                                value={t.status}
+                                onChange={(e) => handleUpdateTask(t.id, { status: e.target.value })}
+                                className="px-2.5 py-0.5 rounded-full bg-signal-500/20 text-signal-300 border border-signal-500/30 text-[10px] font-mono font-bold uppercase focus:outline-none"
+                              >
+                                <option value="pendente">Pendente</option>
+                                <option value="em_andamento">Em andamento</option>
+                                <option value="concluido">Concluído</option>
+                              </select>
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
                             <div className="flex-1 bg-slate-900 h-2 rounded-full overflow-hidden border border-white/10">
                               <div className="bg-gradient-to-r from-blue-500 to-cyan-400 h-full rounded-full" style={{ width: `${t.progress}%` }} />
                             </div>
-                            <span className="text-xs font-mono font-bold text-slate-300">{t.progress}%</span>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={t.progress}
+                              onChange={(e) => handleUpdateTask(t.id, { progress: Number(e.target.value) })}
+                              className="w-24 accent-signal-500"
+                            />
+                            <span className="text-xs font-mono font-bold text-slate-300 w-10 text-right">{t.progress}%</span>
                           </div>
                         </div>
                       ))}
@@ -657,7 +1140,16 @@ export default function Dashboard() {
                 {/* TAB CONTENT: DIÁRIO DE OBRA */}
                 {tab === 'diario' && (
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
-                    <h3 className="text-xl font-bold text-white">Diário de Obra Digital</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xl font-bold text-white">Diário de Obra Digital</h3>
+                      <button
+                        onClick={() => setShowNewDiary(true)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-signal-500 hover:bg-signal-400 text-white text-xs font-extrabold transition-all"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Novo Registro</span>
+                      </button>
+                    </div>
                     {tabLoading && <p className="text-sm text-slate-400">Carregando diários…</p>}
                     {!tabLoading && diary.length === 0 && <p className="text-sm text-slate-400">Nenhum registro de diário cadastrado.</p>}
 
@@ -686,7 +1178,16 @@ export default function Dashboard() {
                 {/* TAB CONTENT: MATERIAIS */}
                 {tab === 'materiais' && (
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
-                    <h3 className="text-xl font-bold text-white">Estoque de Materiais & Insumos</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xl font-bold text-white">Estoque de Materiais & Insumos</h3>
+                      <button
+                        onClick={() => setShowNewMaterial(true)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-signal-500 hover:bg-signal-400 text-white text-xs font-extrabold transition-all"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Novo Suprimento</span>
+                      </button>
+                    </div>
                     {tabLoading && <p className="text-sm text-slate-400">Carregando materiais…</p>}
                     <div className="space-y-3 pt-2">
                       {materials.map((m) => {
@@ -697,10 +1198,24 @@ export default function Dashboard() {
                               <p className="font-bold text-white text-sm">{m.name}</p>
                               {m.notes && <p className="text-xs text-slate-400">{m.notes}</p>}
                             </div>
-                            <div className="text-right font-mono">
-                              <span className={`text-sm font-bold ${low ? 'text-rose-400' : 'text-emerald-400'}`}>
+                            <div className="flex items-center gap-3">
+                              <span className={`text-sm font-bold font-mono ${low ? 'text-rose-400' : 'text-emerald-400'}`}>
                                 {m.acquired_quantity} / {m.needed_quantity} {m.unit}
                               </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleRestockMaterial(m, -1)}
+                                  className="w-7 h-7 rounded-lg bg-white/10 border border-white/10 text-slate-300 hover:text-white text-sm font-bold"
+                                >
+                                  −
+                                </button>
+                                <button
+                                  onClick={() => handleRestockMaterial(m, 1)}
+                                  className="w-7 h-7 rounded-lg bg-white/10 border border-white/10 text-slate-300 hover:text-white text-sm font-bold"
+                                >
+                                  +
+                                </button>
+                              </div>
                             </div>
                           </div>
                         );
@@ -716,9 +1231,49 @@ export default function Dashboard() {
                       <h3 className="text-xl font-bold text-white">Checklist de Segurança do Trabalho</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                         {safetyItems.map((s) => (
-                          <div key={s.id} className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-3 text-sm">
+                          <button
+                            key={s.id}
+                            onClick={() => handleToggleSafetyItem(s)}
+                            className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 flex items-center gap-3 text-sm text-left transition-all"
+                          >
                             <CheckCircle2 className={`w-5 h-5 shrink-0 ${s.completed ? 'text-emerald-400' : 'text-slate-600'}`} />
                             <span className={s.completed ? 'text-slate-200' : 'text-slate-400'}>{s.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-bold text-white">Ocorrências & Registro de Segurança</h3>
+                        <button
+                          onClick={() => setShowNewIncident(true)}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-signal-500 hover:bg-signal-400 text-white text-xs font-extrabold transition-all"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Nova Ocorrência</span>
+                        </button>
+                      </div>
+                      {incidents.length === 0 && <p className="text-sm text-slate-400">Nenhuma ocorrência registrada.</p>}
+                      <div className="space-y-3 pt-2">
+                        {incidents.map((i) => (
+                          <div key={i.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
+                            <div className="flex items-center justify-between text-xs font-mono">
+                              <span className="text-cyan-300 font-bold">{new Date(i.occurred_at).toLocaleDateString('pt-BR')} · {i.type}</span>
+                              <span
+                                className={`px-2 py-0.5 rounded-full border font-bold uppercase ${
+                                  i.severity === 'grave'
+                                    ? 'bg-rose-500/20 border-rose-500/30 text-rose-300'
+                                    : i.severity === 'moderada'
+                                    ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+                                    : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                                }`}
+                              >
+                                {i.severity}
+                              </span>
+                            </div>
+                            <p className="text-sm text-slate-200">{i.description}</p>
+                            {i.action_taken && <p className="text-xs text-slate-400">Ação tomada: {i.action_taken}</p>}
                           </div>
                         ))}
                       </div>
@@ -729,7 +1284,16 @@ export default function Dashboard() {
                 {/* TAB CONTENT: EQUIPE */}
                 {tab === 'equipe' && (
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
-                    <h3 className="text-xl font-bold text-white">Equipe Alocada na Obra</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xl font-bold text-white">Equipe Alocada na Obra</h3>
+                      <button
+                        onClick={() => setShowInviteMember(true)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-signal-500 hover:bg-signal-400 text-white text-xs font-extrabold transition-all"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>Adicionar Colaborador</span>
+                      </button>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                       {members.map((m) => (
                         <div key={m.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
@@ -745,7 +1309,16 @@ export default function Dashboard() {
                 {/* TAB CONTENT: ORDENS DE SERVIÇO */}
                 {tab === 'os' && (
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
-                    <h3 className="text-xl font-bold text-white">Ordens de Serviço (OS)</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xl font-bold text-white">Ordens de Serviço (OS)</h3>
+                      <button
+                        onClick={() => setShowNewOS(true)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-signal-500 hover:bg-signal-400 text-white text-xs font-extrabold transition-all"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Nova OS</span>
+                      </button>
+                    </div>
                     <div className="space-y-3 pt-2">
                       {serviceOrders.map((os) => (
                         <div key={os.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -779,18 +1352,71 @@ export default function Dashboard() {
                         </div>
                       ))}
                     </div>
+                    <form onSubmit={handleSendMessage} className="flex items-center gap-2 pt-3 border-t border-white/10">
+                      <input
+                        type="text"
+                        placeholder="Escreva uma mensagem para a equipe da obra…"
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        className={inputClass}
+                      />
+                      <button
+                        type="submit"
+                        disabled={!chatInput.trim()}
+                        className="shrink-0 p-3 rounded-xl bg-signal-500 hover:bg-signal-400 disabled:opacity-50 text-white transition-all"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </form>
                   </div>
                 )}
 
                 {/* TAB CONTENT: FINANCEIRO (PREMIUM) */}
                 {tab === 'financeiro' && (
                   <div className="relative bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
                       <h3 className="text-xl font-bold text-white flex items-center gap-2">
                         <Wallet className="w-5 h-5 text-signal-400" />
                         <span>Módulo Financeiro da Obra</span>
                       </h3>
+                      {isPremium && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button onClick={() => setShowNewBudgetItem(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white text-xs font-bold hover:bg-white/20 transition-all">
+                            <Plus className="w-3.5 h-3.5" /><span>Categoria</span>
+                          </button>
+                          <button onClick={() => setShowNewCashFlow(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white text-xs font-bold hover:bg-white/20 transition-all">
+                            <Plus className="w-3.5 h-3.5" /><span>Lançamento</span>
+                          </button>
+                          <button onClick={() => setShowNewPayment(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-signal-500 hover:bg-signal-400 text-white text-xs font-extrabold transition-all">
+                            <Plus className="w-3.5 h-3.5" /><span>Pagamento</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
+
+                    {isPremium && budgetForecast.status !== 'sem_dados' && (
+                      <div
+                        className={`p-4 rounded-2xl border text-sm font-medium flex items-start gap-3 ${
+                          budgetForecast.status === 'estourado' || budgetForecast.status === 'critico'
+                            ? 'bg-rose-500/10 border-rose-500/30 text-rose-200'
+                            : budgetForecast.status === 'atencao'
+                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                        }`}
+                      >
+                        <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold block">Previsão de Ruptura de Orçamento</span>
+                          <span>
+                            {budgetForecast.status === 'estourado'
+                              ? 'O orçamento planejado já foi ultrapassado.'
+                              : budgetForecast.daysToRupture !== null
+                              ? `No ritmo de gasto atual, o orçamento se esgota em ~${budgetForecast.daysToRupture} dias (${budgetForecast.projectedRuptureDate?.toLocaleDateString('pt-BR')}).`
+                              : 'Orçamento sob controle no ritmo de gasto atual.'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     {!isPremium && (
                       <div className="absolute inset-0 rounded-3xl bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center text-center p-8 z-20 space-y-4">
@@ -835,6 +1461,32 @@ export default function Dashboard() {
                           ))}
                         </div>
                       </div>
+
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-mono font-bold uppercase text-slate-400">Pagamentos a Fornecedores & Equipe</h4>
+                        <div className="space-y-2">
+                          {payments.map((p) => (
+                            <div key={p.id} className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
+                              <div>
+                                <span className="font-bold text-white">{p.payee_name}</span>
+                                <span className="text-slate-400 font-mono"> · {p.payee_type}</span>
+                              </div>
+                              <div className="flex items-center gap-2 font-mono">
+                                <span className="font-bold">{currency(p.amount)}</span>
+                                <span
+                                  className={`px-2 py-0.5 rounded-full border font-bold uppercase ${
+                                    p.status === 'Pago'
+                                      ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                                      : 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+                                  }`}
+                                >
+                                  {p.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -843,6 +1495,334 @@ export default function Dashboard() {
           </main>
         </div>
       </div>
+
+      {/* ===== MODAIS DE CRIAÇÃO/EDIÇÃO ===== */}
+
+      {showNewProject && (
+        <Modal title="Cadastrar Nova Obra" onClose={() => setShowNewProject(false)}>
+          <form onSubmit={handleCreateProject} className="space-y-4">
+            {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+            <div className="space-y-1">
+              <label className={labelClass}>Nome da Obra</label>
+              <input required value={projectForm.name} onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })} className={inputClass} placeholder="Residencial Alphaville - Bloco A" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Cliente</label>
+              <input value={projectForm.client_name} onChange={(e) => setProjectForm({ ...projectForm, client_name: e.target.value })} className={inputClass} placeholder="Nome do cliente / incorporadora" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Endereço</label>
+              <input value={projectForm.address} onChange={(e) => setProjectForm({ ...projectForm, address: e.target.value })} className={inputClass} placeholder="Rua, número - Cidade/UF" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Prazo Final</label>
+              <input type="date" value={projectForm.deadline} onChange={(e) => setProjectForm({ ...projectForm, deadline: e.target.value })} className={inputClass} />
+            </div>
+            <SubmitButton loading={formLoading}>Criar Obra</SubmitButton>
+          </form>
+        </Modal>
+      )}
+
+      {showNewTask && (
+        <Modal title="Nova Tarefa do Cronograma" onClose={() => setShowNewTask(false)}>
+          <form onSubmit={handleCreateTask} className="space-y-4">
+            {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+            <div className="space-y-1">
+              <label className={labelClass}>Título do Serviço</label>
+              <input required value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} className={inputClass} placeholder="Concretagem da Laje do 3º Pavimento" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Categoria</label>
+              <input value={taskForm.category} onChange={(e) => setTaskForm({ ...taskForm, category: e.target.value })} className={inputClass} placeholder="Estrutura, Alvenaria, Acabamento…" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Prazo</label>
+              <input type="date" value={taskForm.deadline} onChange={(e) => setTaskForm({ ...taskForm, deadline: e.target.value })} className={inputClass} />
+            </div>
+            <SubmitButton loading={formLoading}>Criar Tarefa</SubmitButton>
+          </form>
+        </Modal>
+      )}
+
+      {showNewDiary && (
+        <Modal title="Novo Registro de Diário" onClose={() => setShowNewDiary(false)}>
+          <form onSubmit={handleCreateDiary} className="space-y-4">
+            {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={labelClass}>Data</label>
+                <input type="date" value={diaryForm.entry_date} onChange={(e) => setDiaryForm({ ...diaryForm, entry_date: e.target.value })} className={inputClass} />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Clima</label>
+                <select value={diaryForm.weather} onChange={(e) => setDiaryForm({ ...diaryForm, weather: e.target.value })} className={inputClass}>
+                  <option value="sol">☀️ Sol</option>
+                  <option value="nublado">☁️ Nublado</option>
+                  <option value="chuva">🌧️ Chuva</option>
+                  <option value="tempestade">⛈️ Tempestade</option>
+                </select>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Trabalhadores em Obra</label>
+              <input type="number" min={0} value={diaryForm.workers_count} onChange={(e) => setDiaryForm({ ...diaryForm, workers_count: e.target.value })} className={inputClass} placeholder="24" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Descrição do Dia</label>
+              <textarea required rows={3} value={diaryForm.description} onChange={(e) => setDiaryForm({ ...diaryForm, description: e.target.value })} className={inputClass} placeholder="Atividades executadas hoje…" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Ocorrências (opcional)</label>
+              <textarea rows={2} value={diaryForm.occurrences} onChange={(e) => setDiaryForm({ ...diaryForm, occurrences: e.target.value })} className={inputClass} placeholder="Atrasos, imprevistos…" />
+            </div>
+            <SubmitButton loading={formLoading}>Registrar Diário</SubmitButton>
+          </form>
+        </Modal>
+      )}
+
+      {showNewMaterial && (
+        <Modal title="Novo Suprimento / Material" onClose={() => setShowNewMaterial(false)}>
+          <form onSubmit={handleCreateMaterial} className="space-y-4">
+            {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+            <div className="space-y-1">
+              <label className={labelClass}>Nome do Material</label>
+              <input required value={materialForm.name} onChange={(e) => setMaterialForm({ ...materialForm, name: e.target.value })} className={inputClass} placeholder="Cimento CP II-Z 50kg" />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <label className={labelClass}>Unidade</label>
+                <select value={materialForm.unit} onChange={(e) => setMaterialForm({ ...materialForm, unit: e.target.value })} className={inputClass}>
+                  {MATERIAL_UNITS.map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Necessário</label>
+                <input type="number" min={0} value={materialForm.needed_quantity} onChange={(e) => setMaterialForm({ ...materialForm, needed_quantity: e.target.value })} className={inputClass} />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Adquirido</label>
+                <input type="number" min={0} value={materialForm.acquired_quantity} onChange={(e) => setMaterialForm({ ...materialForm, acquired_quantity: e.target.value })} className={inputClass} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Observações</label>
+              <input value={materialForm.notes} onChange={(e) => setMaterialForm({ ...materialForm, notes: e.target.value })} className={inputClass} placeholder="Fornecedor, uso previsto…" />
+            </div>
+            <SubmitButton loading={formLoading}>Cadastrar Material</SubmitButton>
+          </form>
+        </Modal>
+      )}
+
+      {showNewIncident && (
+        <Modal title="Registrar Ocorrência de Segurança" onClose={() => setShowNewIncident(false)}>
+          <form onSubmit={handleCreateIncident} className="space-y-4">
+            {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={labelClass}>Data</label>
+                <input type="date" value={incidentForm.occurred_at} onChange={(e) => setIncidentForm({ ...incidentForm, occurred_at: e.target.value })} className={inputClass} />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Tipo</label>
+                <select value={incidentForm.type} onChange={(e) => setIncidentForm({ ...incidentForm, type: e.target.value })} className={inputClass}>
+                  <option value="ocorrencia">Ocorrência</option>
+                  <option value="quase_acidente">Quase Acidente</option>
+                  <option value="acidente">Acidente</option>
+                </select>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Gravidade</label>
+              <select value={incidentForm.severity} onChange={(e) => setIncidentForm({ ...incidentForm, severity: e.target.value })} className={inputClass}>
+                <option value="leve">Leve</option>
+                <option value="moderada">Moderada</option>
+                <option value="grave">Grave</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Descrição</label>
+              <textarea required rows={3} value={incidentForm.description} onChange={(e) => setIncidentForm({ ...incidentForm, description: e.target.value })} className={inputClass} />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Pessoa Envolvida (opcional)</label>
+              <input value={incidentForm.injured_person} onChange={(e) => setIncidentForm({ ...incidentForm, injured_person: e.target.value })} className={inputClass} />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Ação Tomada</label>
+              <input value={incidentForm.action_taken} onChange={(e) => setIncidentForm({ ...incidentForm, action_taken: e.target.value })} className={inputClass} />
+            </div>
+            <SubmitButton loading={formLoading}>Registrar Ocorrência</SubmitButton>
+          </form>
+        </Modal>
+      )}
+
+      {showInviteMember && (
+        <Modal
+          title="Adicionar Colaborador"
+          onClose={() => {
+            setShowInviteMember(false);
+            setFoundMember(null);
+            setMemberSearch('');
+            setMemberSearchError('');
+          }}
+        >
+          <div className="space-y-4">
+            {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+            <form onSubmit={handleSearchMember} className="flex items-center gap-2">
+              <input
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                className={inputClass}
+                placeholder="Código do colaborador ou telefone"
+              />
+              <button type="submit" disabled={formLoading} className="shrink-0 p-3 rounded-xl bg-white/10 border border-white/10 text-white hover:bg-white/20 transition-all">
+                <Search className="w-4 h-4" />
+              </button>
+            </form>
+            {memberSearchError && <p className="text-xs text-rose-300">{memberSearchError}</p>}
+            {foundMember && (
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-bold text-white text-sm">{foundMember.full_name}</p>
+                  <p className="text-xs text-slate-400 font-mono">{foundMember.role} · {foundMember.member_code}</p>
+                </div>
+                <button
+                  onClick={handleInviteMember}
+                  disabled={formLoading}
+                  className="px-4 py-2 rounded-xl bg-signal-500 hover:bg-signal-400 text-white text-xs font-extrabold transition-all"
+                >
+                  Adicionar à Obra
+                </button>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {showNewOS && (
+        <Modal title="Nova Ordem de Serviço" onClose={() => setShowNewOS(false)}>
+          <form onSubmit={handleCreateServiceOrder} className="space-y-4">
+            {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+            <div className="space-y-1">
+              <label className={labelClass}>Empresa Executora</label>
+              <input required value={osForm.company_name} onChange={(e) => setOsForm({ ...osForm, company_name: e.target.value })} className={inputClass} />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Cliente</label>
+              <input required value={osForm.client_name} onChange={(e) => setOsForm({ ...osForm, client_name: e.target.value })} className={inputClass} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={labelClass}>Telefone do Cliente</label>
+                <input value={osForm.client_phone} onChange={(e) => setOsForm({ ...osForm, client_phone: e.target.value })} className={inputClass} />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Prazo</label>
+                <input type="date" value={osForm.deadline} onChange={(e) => setOsForm({ ...osForm, deadline: e.target.value })} className={inputClass} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Descrição do Problema</label>
+              <textarea rows={2} value={osForm.problem_description} onChange={(e) => setOsForm({ ...osForm, problem_description: e.target.value })} className={inputClass} />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Descrição da Execução</label>
+              <textarea rows={2} value={osForm.execution_description} onChange={(e) => setOsForm({ ...osForm, execution_description: e.target.value })} className={inputClass} />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Valor da Mão de Obra (R$)</label>
+              <input type="number" min={0} value={osForm.labor_value} onChange={(e) => setOsForm({ ...osForm, labor_value: e.target.value })} className={inputClass} />
+            </div>
+            <SubmitButton loading={formLoading}>Criar Ordem de Serviço</SubmitButton>
+          </form>
+        </Modal>
+      )}
+
+      {showNewBudgetItem && (
+        <Modal title="Nova Categoria de Orçamento" onClose={() => setShowNewBudgetItem(false)}>
+          <form onSubmit={handleCreateBudgetItem} className="space-y-4">
+            {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+            <div className="space-y-1">
+              <label className={labelClass}>Categoria</label>
+              <input required value={budgetItemForm.category} onChange={(e) => setBudgetItemForm({ ...budgetItemForm, category: e.target.value })} className={inputClass} placeholder="Estrutura & Fundação" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={labelClass}>Valor Planejado (R$)</label>
+                <input type="number" min={0} value={budgetItemForm.planned_value} onChange={(e) => setBudgetItemForm({ ...budgetItemForm, planned_value: e.target.value })} className={inputClass} />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Valor Executado (R$)</label>
+                <input type="number" min={0} value={budgetItemForm.actual_value} onChange={(e) => setBudgetItemForm({ ...budgetItemForm, actual_value: e.target.value })} className={inputClass} />
+              </div>
+            </div>
+            <SubmitButton loading={formLoading}>Salvar Categoria</SubmitButton>
+          </form>
+        </Modal>
+      )}
+
+      {showNewCashFlow && (
+        <Modal title="Novo Lançamento de Caixa" onClose={() => setShowNewCashFlow(false)}>
+          <form onSubmit={handleCreateCashFlow} className="space-y-4">
+            {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={labelClass}>Tipo</label>
+                <select value={cashFlowForm.type} onChange={(e) => setCashFlowForm({ ...cashFlowForm, type: e.target.value as 'entrada' | 'saida' })} className={inputClass}>
+                  <option value="saida">Saída</option>
+                  <option value="entrada">Entrada</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Data</label>
+                <input type="date" value={cashFlowForm.entry_date} onChange={(e) => setCashFlowForm({ ...cashFlowForm, entry_date: e.target.value })} className={inputClass} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Descrição</label>
+              <input required value={cashFlowForm.description} onChange={(e) => setCashFlowForm({ ...cashFlowForm, description: e.target.value })} className={inputClass} placeholder="Medição 3 - Cliente" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Valor (R$)</label>
+              <input required type="number" min={0} value={cashFlowForm.amount} onChange={(e) => setCashFlowForm({ ...cashFlowForm, amount: e.target.value })} className={inputClass} />
+            </div>
+            <SubmitButton loading={formLoading}>Salvar Lançamento</SubmitButton>
+          </form>
+        </Modal>
+      )}
+
+      {showNewPayment && (
+        <Modal title="Novo Pagamento" onClose={() => setShowNewPayment(false)}>
+          <form onSubmit={handleCreatePayment} className="space-y-4">
+            {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+            <div className="space-y-1">
+              <label className={labelClass}>Beneficiário</label>
+              <input required value={paymentForm.payee_name} onChange={(e) => setPaymentForm({ ...paymentForm, payee_name: e.target.value })} className={inputClass} placeholder="Votorantim Cimentos" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={labelClass}>Tipo</label>
+                <select value={paymentForm.payee_type} onChange={(e) => setPaymentForm({ ...paymentForm, payee_type: e.target.value })} className={inputClass}>
+                  <option value="Fornecedor">Fornecedor</option>
+                  <option value="Funcionário">Funcionário</option>
+                  <option value="Prestador">Prestador de Serviço</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Vencimento</label>
+                <input type="date" value={paymentForm.due_date} onChange={(e) => setPaymentForm({ ...paymentForm, due_date: e.target.value })} className={inputClass} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Valor (R$)</label>
+              <input required type="number" min={0} value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} className={inputClass} />
+            </div>
+            <SubmitButton loading={formLoading}>Registrar Pagamento</SubmitButton>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }
