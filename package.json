@@ -9,12 +9,20 @@
     "preview": "vite preview --port 3000 --host 0.0.0.0"
   },
   "dependencies": {
+<<<<<<< HEAD
     "@supabase/supabase-js": "^2.45.0",
     "lucide-react": "^0.475.0",
     "motion": "^12.43.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-router-dom": "^6.28.0"
+=======
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-router-dom": "^6.28.0",
+    "lucide-react": "^0.475.0",
+    "@supabase/supabase-js": "^2.45.0"
+>>>>>>> 81e650ff911497f9aa49347baba54842db56952b
   },
   "devDependencies": {
     "@types/react": "^19.0.8",

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme {
+<<<<<<< HEAD
   /* ===== Paleta — Blueprint & Glassmorphism Premium ===== */
   --color-blueprint-950: #070d19;   /* fundo ultra dark obsidian */
   --color-blueprint-900: #0f1c33;   /* fundo de cards escuros */
@@ -22,6 +23,21 @@
   --color-concrete-900: #f8fafc;
 
   --color-success: #10b981;
+=======
+  /* ===== Paleta — inspirada em prancha de projeto de obra (blueprint) ===== */
+  --color-blueprint-950: #0a1e3d;   /* navy quase preto — fundo do hero, "papel" do projeto */
+  --color-blueprint-900: #0f2a52;
+  --color-blueprint-700: #16407a;
+  --color-blueprint-line: #2f5a9e;  /* linhas de grade do blueprint */
+  --color-signal-500: #ff5a1f;      /* laranja de sinalização de obra — cor de destaque */
+  --color-signal-400: #ff7a45;
+  --color-concrete-100: #f4f2ee;    /* "papel" claro pras seções fora do hero */
+  --color-concrete-200: #e7e3db;
+  --color-concrete-400: #b8b2a4;
+  --color-concrete-700: #55524a;
+  --color-concrete-900: #221f1a;
+  --color-success: #00c896;
+>>>>>>> 81e650ff911497f9aa49347baba54842db56952b
   --color-warning: #f59e0b;
   --color-error: #ef4444;
 
@@ -33,14 +49,22 @@
 
 html {
   scroll-behavior: smooth;
+<<<<<<< HEAD
   color-scheme: dark;
+=======
+>>>>>>> 81e650ff911497f9aa49347baba54842db56952b
 }
 
 body {
   font-family: var(--font-body);
+<<<<<<< HEAD
   background-color: var(--color-blueprint-950);
   color: #f8fafc;
   overflow-x: hidden;
+=======
+  background-color: var(--color-concrete-100);
+  color: var(--color-concrete-900);
+>>>>>>> 81e650ff911497f9aa49347baba54842db56952b
 }
 
 /* Respeita usuários que pedem menos movimento */
@@ -59,6 +83,7 @@ body {
   outline-offset: 2px;
 }
 
+<<<<<<< HEAD
 /* ===== Fundo em grade de blueprint (papel de projeto luminoso) ===== */
 .blueprint-grid {
   background-image:
@@ -72,20 +97,34 @@ body {
     linear-gradient(rgba(56, 189, 248, 0.1) 1px, transparent 1px),
     linear-gradient(90deg, rgba(56, 189, 248, 0.1) 1px, transparent 1px);
   background-size: 16px 16px;
+=======
+/* ===== Fundo em grade de blueprint (o "papel de projeto") ===== */
+.blueprint-grid {
+  background-image:
+    linear-gradient(var(--color-blueprint-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-blueprint-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+>>>>>>> 81e650ff911497f9aa49347baba54842db56952b
 }
 
 /* ===== Elemento-assinatura: carimbo de revisão de prancha ===== */
 .revision-stamp {
+<<<<<<< HEAD
   border: 1.5px solid currentColor;
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   letter-spacing: 0.1em;
+=======
+  border: 2px solid currentColor;
+  position: relative;
+>>>>>>> 81e650ff911497f9aa49347baba54842db56952b
 }
 .revision-stamp::before {
   content: '';
   position: absolute;
+<<<<<<< HEAD
   inset: 3px;
   border: 1px solid currentColor;
   opacity: 0.4;
@@ -125,3 +164,10 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #ff5a1f;
 }
+=======
+  inset: 4px;
+  border: 1px solid currentColor;
+  opacity: 0.5;
+  pointer-events: none;
+}
+>>>>>>> 81e650ff911497f9aa49347baba54842db56952b
