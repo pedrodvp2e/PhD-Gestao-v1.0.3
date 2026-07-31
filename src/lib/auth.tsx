@@ -90,9 +90,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  // Conta com acesso Premium ilimitado garantido, independente do que estiver no banco.
+  const UNLIMITED_ACCESS_EMAILS = ['pedrodanelon980@gmail.com'];
+  const hasUnlimitedAccess = Boolean(
+    session?.user?.email && UNLIMITED_ACCESS_EMAILS.includes(session.user.email.toLowerCase())
+  );
+
   const isPremium =
-    profile?.premium_status === 'premium' &&
-    (!profile.premium_expires_at || new Date(profile.premium_expires_at) > new Date());
+    hasUnlimitedAccess ||
+    (profile?.premium_status === 'premium' &&
+      (!profile.premium_expires_at || new Date(profile.premium_expires_at) > new Date()));
 
   return (
     <AuthContext.Provider
