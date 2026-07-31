@@ -53,7 +53,11 @@ export default function NavBar({ dark = false }: { dark?: boolean }) {
             <>
               <Link
                 to="/login"
-                className="text-sm font-semibold hidden sm:inline hover:text-signal-500 transition-colors"
+                className={`text-sm font-bold px-4 py-2.5 rounded-md border transition-colors ${
+                  dark
+                    ? 'border-concrete-100/30 hover:border-signal-400 hover:text-signal-400'
+                    : 'border-blueprint-950/30 hover:border-signal-500 hover:text-signal-500'
+                }`}
               >
                 Entrar
               </Link>

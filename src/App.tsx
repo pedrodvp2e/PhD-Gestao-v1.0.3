@@ -108,6 +108,13 @@ export default function App() {
             </Link>
           </div>
 
+          <p className="mt-5 text-sm text-concrete-400">
+            Já tem conta?{' '}
+            <Link to="/login" className="font-bold text-signal-400 hover:underline">
+              Entrar
+            </Link>
+          </p>
+
           <div className="mt-14 flex items-center gap-2 font-mono text-xs text-concrete-400">
             <span className="revision-stamp text-signal-400 px-2 py-1">REV. 1.0.1</span>
             <span>· instalado ocupa 11,75&nbsp;MB · Android hoje, iOS em avaliação</span>
