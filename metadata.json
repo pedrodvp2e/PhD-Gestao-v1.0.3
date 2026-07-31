@@ -1,0 +1,6 @@
+{
+  "name": "PhD Gestão",
+  "description": "Sistema de Gestão PhD - Painel de controle, previsões de orçamento, gerenciamento de materiais, relatórios e controle de assinaturas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

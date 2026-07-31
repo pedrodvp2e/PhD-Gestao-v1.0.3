@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+@theme {
+  /* ===== Paleta — Blueprint & Glassmorphism Premium ===== */
+  --color-blueprint-950: #070d19;   /* fundo ultra dark obsidian */
+  --color-blueprint-900: #0f1c33;   /* fundo de cards escuros */
+  --color-blueprint-800: #172a4d;
+  --color-blueprint-700: #1e3766;
+  --color-blueprint-line: #2a4b80;  /* linhas de grade do blueprint */
+  
+  --color-signal-500: #ff5a1f;      /* laranja de sinalização de obra */
+  --color-signal-400: #ff753d;
+  --color-signal-300: #ff9d75;
+
+  --color-cyan-brand: #06b6d4;      /* destaque ciano */
+  
+  --color-concrete-100: #0b1326;    /* fundo escuro premium */
+  --color-concrete-200: #15223d;
+  --color-concrete-300: #213254;
+  --color-concrete-400: #8899b8;
+  --color-concrete-700: #cbd5e1;
+  --color-concrete-900: #f8fafc;
+
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+
+  --font-display: 'Archivo Black', 'Barlow Condensed', sans-serif;
+  --font-heading: 'Barlow Condensed', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-blueprint-950);
+  color: #f8fafc;
+  overflow-x: hidden;
+}
+
+/* Respeita usuários que pedem menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Foco visível para navegação por teclado */
+:focus-visible {
+  outline: 2px solid var(--color-signal-500);
+  outline-offset: 2px;
+}
+
+/* ===== Fundo em grade de blueprint (papel de projeto luminoso) ===== */
+.blueprint-grid {
+  background-image:
+    linear-gradient(rgba(42, 75, 128, 0.2) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(42, 75, 128, 0.2) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.blueprint-grid-dense {
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.1) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* ===== Elemento-assinatura: carimbo de revisão de prancha ===== */
+.revision-stamp {
+  border: 1.5px solid currentColor;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.1em;
+}
+.revision-stamp::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid currentColor;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ===== Glassmorphism utilities ===== */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-panel-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-panel-hover:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 0 20px 0 rgba(6, 182, 212, 0.15);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #070d19;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e3766;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #ff5a1f;
+}
