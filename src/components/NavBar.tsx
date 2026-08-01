@@ -69,7 +69,8 @@ export default function NavBar({ dark = true }: { dark?: boolean }) {
           {session ? (
             <div className="flex items-center gap-3">
               <Link
-                to="/painel"
+                to="/painel?tab=perfil"
+                title="Ver meu perfil"
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 text-sm font-semibold text-slate-200 hover:text-white transition-all"
               >
                 <div className="w-6 h-6 rounded-lg bg-signal-500/20 text-signal-400 flex items-center justify-center font-bold text-xs">

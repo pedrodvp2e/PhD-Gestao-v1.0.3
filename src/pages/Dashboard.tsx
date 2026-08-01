@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Lock,
   Building2,
@@ -35,12 +35,22 @@ import {
   UserCircle,
   Camera,
   Calendar,
+  Sun,
+  Cloud,
+  CloudSun,
+  CloudFog,
+  CloudDrizzle,
+  CloudRain,
+  CloudLightning,
+  MapPin,
+  Monitor,
+  Smartphone,
 } from 'lucide-react';
 import { shareElementAsImage } from '@/lib/shareReport';
 import { shareElementAsPdf } from '@/lib/sharePdfReport';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { supabase, uploadProjectPhoto } from '@/lib/supabase';
 import NavBar from '@/components/NavBar';
 import GlobalBackground from '@/components/GlobalBackground';
 import phdLogo from '@/assets/images/phd_app_logo_1785469467323.jpg';
@@ -137,6 +147,9 @@ type ChatMessage = {
   profiles: { full_name: string | null } | null;
 };
 
+type SupplierQuote = { id: string; material_id: string; supplier_name: string; unit_price: number };
+type MaterialReceipt = { id: string; material_id: string; amount: number; purchased_at: string; photo: string };
+
 type BudgetItem = { id: string; category: string; planned_value: number; actual_value: number };
 type CashFlowEntry = { id: string; entry_date: string; type: 'entrada' | 'saida'; description: string; amount: number };
 type Payment = {
@@ -225,7 +238,34 @@ export default function Dashboard() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [tab, setTab] = useState<TabId>('visao');
+  // Relógio e clima em tempo real (funciona tanto em PC quanto em celular Android,
+  // já que usa a Geolocalização do navegador — não depende do app nativo)
+  const [currentDeviceTime, setCurrentDeviceTime] = useState<Date>(new Date());
+  const [weather, setWeather] = useState<{
+    temp: number;
+    condition: string;
+    icon: string;
+    city: string;
+    humidity?: number;
+    windspeed: number;
+    isReal: boolean;
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [locationPermission, setLocationPermission] = useState<'prompt' | 'granted' | 'denied' | 'requesting'>('prompt');
+  const isAndroidDevice = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<TabId>(() => {
+    const requested = searchParams.get('tab');
+    return (TABS.some((t) => t.id === requested) ? (requested as TabId) : 'visao');
+  });
+  useEffect(() => {
+    const requested = searchParams.get('tab');
+    if (requested && TABS.some((t) => t.id === requested)) setTab(requested as TabId);
+  }, [searchParams]);
   const [tabLoading, setTabLoading] = useState(false);
 
   // Estados dos dados da obra selecionada
@@ -233,6 +273,16 @@ export default function Dashboard() {
   const [diary, setDiary] = useState<DiaryEntry[]>([]);
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
   const [stockSnapshots, setStockSnapshots] = useState<MaterialStockSnapshot[]>([]);
+  const [supplierQuotes, setSupplierQuotes] = useState<SupplierQuote[]>([]);
+  const [materialReceipts, setMaterialReceipts] = useState<MaterialReceipt[]>([]);
+  const [quotingMaterialId, setQuotingMaterialId] = useState<string | null>(null);
+  const [newQuoteSupplier, setNewQuoteSupplier] = useState('');
+  const [newQuotePrice, setNewQuotePrice] = useState('');
+  const [receiptMaterialId, setReceiptMaterialId] = useState<string | null>(null);
+  const [newReceiptAmount, setNewReceiptAmount] = useState('');
+  const [newReceiptDate, setNewReceiptDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [newReceiptPhoto, setNewReceiptPhoto] = useState<string | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [progressSnapshots, setProgressSnapshots] = useState<ProgressSnapshot[]>([]);
   const [safetyItems, setSafetyItems] = useState<SafetyItem[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -291,15 +341,36 @@ export default function Dashboard() {
   const [profileSaved, setProfileSaved] = useState(false);
   const [foundMember, setFoundMember] = useState<{ id: string; full_name: string; role: string; member_code: string } | null>(null);
   const [memberSearchError, setMemberSearchError] = useState('');
-  const [osForm, setOsForm] = useState({
-    company_name: '',
-    client_name: '',
-    client_phone: '',
+  const emptyOsForm = () => ({
+    start_date: '',
     deadline: '',
+    company_name: '',
+    company_cnpj: '',
+    company_contact: '',
+    company_responsible: '',
+    client_name: '',
+    client_document: '',
+    client_phone: '',
+    client_email: '',
+    client_address: '',
     problem_description: '',
     execution_description: '',
+    materials: [] as { name: string; quantity: number; unit_price: number }[],
+    team_names: '',
     labor_value: '',
+    payment_method: '',
   });
+  const [osMaterialDraft, setOsMaterialDraft] = useState({ name: '', quantity: '', unit_price: '' });
+  const addOsMaterial = () => {
+    if (!osMaterialDraft.name.trim() || !osMaterialDraft.quantity) return;
+    setOsForm((prev) => ({
+      ...prev,
+      materials: [...prev.materials, { name: osMaterialDraft.name.trim(), quantity: Number(osMaterialDraft.quantity) || 0, unit_price: Number(osMaterialDraft.unit_price) || 0 }],
+    }));
+    setOsMaterialDraft({ name: '', quantity: '', unit_price: '' });
+  };
+  const removeOsMaterial = (idx: number) => setOsForm((prev) => ({ ...prev, materials: prev.materials.filter((_, i) => i !== idx) }));
+  const [osForm, setOsForm] = useState(emptyOsForm());
   const [budgetItemForm, setBudgetItemForm] = useState({ category: '', planned_value: '', actual_value: '' });
   const [cashFlowForm, setCashFlowForm] = useState({
     type: 'saida' as 'entrada' | 'saida',
@@ -404,8 +475,10 @@ export default function Dashboard() {
         case 'materiais': {
           let mats: MaterialRow[] = [];
           let snaps: MaterialStockSnapshot[] = [];
+          let quotes: SupplierQuote[] = [];
+          let receipts: MaterialReceipt[] = [];
           try {
-            const [{ data: mRes }, { data: sRes }] = await Promise.all([
+            const [{ data: mRes }, { data: sRes }, { data: qRes }, { data: rRes }] = await Promise.all([
               supabase
                 .from('materials')
                 .select('id, name, unit, needed_quantity, acquired_quantity, notes')
@@ -414,12 +487,18 @@ export default function Dashboard() {
                 .from('material_stock_snapshots')
                 .select('material_id, snapshot_date, acquired_quantity')
                 .eq('project_id', selectedId),
+              supabase.from('supplier_quotes').select('id, material_id, supplier_name, unit_price').eq('project_id', selectedId),
+              supabase.from('material_receipts').select('id, material_id, amount, purchased_at, photo').eq('project_id', selectedId).order('purchased_at', { ascending: false }),
             ]);
             if (mRes && mRes.length > 0) mats = mRes as MaterialRow[];
             if (sRes && sRes.length > 0) snaps = sRes as MaterialStockSnapshot[];
+            if (qRes && qRes.length > 0) quotes = qRes as SupplierQuote[];
+            if (rRes && rRes.length > 0) receipts = rRes as MaterialReceipt[];
           } catch {}
           setMaterials(mats);
           setStockSnapshots(snaps);
+          setSupplierQuotes(quotes);
+          setMaterialReceipts(receipts);
           break;
         }
         case 'seguranca': {
@@ -668,6 +747,105 @@ export default function Dashboard() {
     await supabase.from('materials').update({ acquired_quantity: nextQty }).eq('id', m.id);
   };
 
+  const handleDeleteMaterial = async (m: MaterialRow) => {
+    if (!confirm(`Excluir o suprimento "${m.name}"? Essa ação não pode ser desfeita.`)) return;
+    setMaterials((prev) => prev.filter((mat) => mat.id !== m.id));
+    await supabase.from('materials').delete().eq('id', m.id);
+  };
+
+  const handleCreateSupplierQuote = async (e: React.FormEvent, materialId: string) => {
+    e.preventDefault();
+    if (!newQuoteSupplier.trim() || !newQuotePrice || !selectedId) return;
+    const { data, error } = await supabase
+      .from('supplier_quotes')
+      .insert({
+        material_id: materialId,
+        project_id: selectedId,
+        supplier_name: newQuoteSupplier.trim(),
+        unit_price: Number(newQuotePrice) || 0,
+        created_by: profile?.id || null,
+      })
+      .select('id, material_id, supplier_name, unit_price')
+      .single();
+    if (!error && data) setSupplierQuotes((prev) => [...prev, data as SupplierQuote]);
+    setNewQuoteSupplier('');
+    setNewQuotePrice('');
+  };
+
+  const handleDeleteSupplierQuote = async (id: string) => {
+    setSupplierQuotes((prev) => prev.filter((q) => q.id !== id));
+    await supabase.from('supplier_quotes').delete().eq('id', id);
+  };
+
+  const handleReceiptPhotoSelect = async (file: File) => {
+    if (!selectedId) return;
+    setUploadingReceipt(true);
+    const { url, error } = await uploadProjectPhoto(selectedId, 'nota-fiscal', file);
+    setUploadingReceipt(false);
+    if (error) {
+      setFormError(error);
+      return;
+    }
+    setNewReceiptPhoto(url);
+  };
+
+  const handleCreateMaterialReceipt = async (e: React.FormEvent, materialId: string) => {
+    e.preventDefault();
+    if (!newReceiptAmount || !newReceiptPhoto || !selectedId) return;
+    const { data, error } = await supabase
+      .from('material_receipts')
+      .insert({
+        material_id: materialId,
+        project_id: selectedId,
+        amount: Number(newReceiptAmount) || 0,
+        purchased_at: newReceiptDate,
+        photo: newReceiptPhoto,
+        created_by: profile?.id || null,
+      })
+      .select('id, material_id, amount, purchased_at, photo')
+      .single();
+    if (!error && data) setMaterialReceipts((prev) => [data as MaterialReceipt, ...prev]);
+    setNewReceiptAmount('');
+    setNewReceiptDate(new Date().toISOString().slice(0, 10));
+    setNewReceiptPhoto(null);
+    setReceiptMaterialId(null);
+  };
+
+  const handleDeleteMaterialReceipt = async (id: string) => {
+    setMaterialReceipts((prev) => prev.filter((r) => r.id !== id));
+    await supabase.from('material_receipts').delete().eq('id', id);
+  };
+
+  const handleDeleteIncident = async (id: string) => {
+    if (!confirm('Excluir esta ocorrência? Essa ação não pode ser desfeita.')) return;
+    setIncidents((prev) => prev.filter((i) => i.id !== id));
+    await supabase.from('incidents').delete().eq('id', id);
+  };
+
+  const handleDeleteMember = async (id: string) => {
+    if (!confirm('Remover este colaborador da obra?')) return;
+    setMembers((prev) => prev.filter((m) => m.id !== id));
+    await supabase.from('project_members').delete().eq('id', id);
+  };
+
+  const handleDeleteServiceOrder = async (id: string) => {
+    if (!confirm('Excluir esta Ordem de Serviço? Essa ação não pode ser desfeita.')) return;
+    setServiceOrders((prev) => prev.filter((o) => o.id !== id));
+    await supabase.from('service_orders').delete().eq('id', id);
+  };
+
+  const handleDeleteCashFlow = async (id: string) => {
+    if (!confirm('Excluir este lançamento do fluxo de caixa?')) return;
+    setCashFlow((prev) => prev.filter((c) => c.id !== id));
+    await supabase.from('cash_flow').delete().eq('id', id);
+  };
+
+  const handleDeletePayment = async (id: string) => {
+    if (!confirm('Excluir este pagamento?')) return;
+    setPayments((prev) => prev.filter((p) => p.id !== id));
+    await supabase.from('payments').delete().eq('id', id);
+  };
+
   const handleToggleSafetyItem = async (item: SafetyItem) => {
     const next = !item.completed;
     setSafetyItems((prev) => prev.map((s) => (s.id === item.id ? { ...s, completed: next } : s)));
@@ -765,18 +943,28 @@ export default function Dashboard() {
         project_id: selectedId,
         os_number: osNumber,
         issued_at: new Date().toISOString(),
+        start_date: osForm.start_date || null,
         deadline: osForm.deadline || null,
         company_name: osForm.company_name.trim(),
+        company_cnpj: osForm.company_cnpj.trim() || null,
+        company_contact: osForm.company_contact.trim() || null,
+        company_responsible: osForm.company_responsible.trim() || null,
         client_name: osForm.client_name.trim(),
+        client_document: osForm.client_document.trim() || null,
         client_phone: osForm.client_phone.trim() || null,
+        client_email: osForm.client_email.trim() || null,
+        client_address: osForm.client_address.trim() || null,
         problem_description: osForm.problem_description.trim() || null,
         execution_description: osForm.execution_description.trim() || null,
+        materials: osForm.materials,
+        team_names: osForm.team_names.trim() || null,
         labor_value: Number(osForm.labor_value) || 0,
+        payment_method: osForm.payment_method.trim() || null,
         status: 'aberta',
         created_by: profile?.id || null,
       });
       if (error) throw new Error(error.message);
-      setOsForm({ company_name: '', client_name: '', client_phone: '', deadline: '', problem_description: '', execution_description: '', labor_value: '' });
+      setOsForm(emptyOsForm());
       setShowNewOS(false);
       refresh();
     } catch (err: any) {
@@ -824,6 +1012,12 @@ export default function Dashboard() {
     } finally {
       setFormLoading(false);
     }
+  };
+
+  const handleDeleteBudgetItem = async (id: string) => {
+    if (!confirm('Excluir esta categoria de orçamento?')) return;
+    setBudget((prev) => prev.filter((b) => b.id !== id));
+    await supabase.from('budget_items').delete().eq('id', id);
   };
 
   const handleCreateCashFlow = async (e: React.FormEvent) => {
@@ -1019,6 +1213,116 @@ export default function Dashboard() {
     }
   };
 
+  const formatTime = (date: Date) => date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  const formatDateLong = (date: Date) => {
+    const weekday = date.toLocaleDateString('pt-BR', { weekday: 'long' });
+    const month = date.toLocaleDateString('pt-BR', { month: 'long' });
+    return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)}, ${date.getDate()} de ${month.charAt(0).toUpperCase() + month.slice(1)} de ${date.getFullYear()}`;
+  };
+
+  const fetchWeatherByCoords = async (lat: number, lon: number, isReal = true) => {
+    try {
+      setWeatherLoading(true);
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=relativehumidity_2m&timezone=auto`);
+      const data = await res.json();
+      if (data?.current_weather) {
+        const cw = data.current_weather;
+        const code = cw.weathercode;
+        let condition = 'Parcialmente nublado';
+        let icon = 'Cloud';
+        if (code === 0) { condition = 'Céu limpo'; icon = 'Sun'; }
+        else if ([1, 2, 3].includes(code)) { condition = 'Parcialmente nublado'; icon = 'CloudSun'; }
+        else if ([45, 48].includes(code)) { condition = 'Nevoeiro'; icon = 'CloudFog'; }
+        else if ([51, 53, 55].includes(code)) { condition = 'Garoa leve'; icon = 'CloudDrizzle'; }
+        else if ([61, 63, 65, 80, 81, 82].includes(code)) { condition = 'Chuva forte'; icon = 'CloudRain'; }
+        else if ([95, 96, 99].includes(code)) { condition = 'Tempestade'; icon = 'CloudLightning'; }
+
+        let cityName = isReal ? 'Local Atual' : 'São Paulo, SP';
+        if (isReal) {
+          try {
+            const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=12&addressdetails=1`, {
+              headers: { 'Accept-Language': 'pt-BR' },
+            });
+            const geoData = await geoRes.json();
+            const addr = geoData?.address;
+            if (addr) {
+              const city = addr.city || addr.town || addr.suburb || addr.village || 'Local Atual';
+              const state = addr.state ? `, ${addr.state}` : '';
+              cityName = `${city}${state}`;
+            }
+          } catch {}
+        }
+
+        setWeather({
+          temp: Math.round(cw.temperature),
+          condition,
+          icon,
+          city: cityName,
+          humidity: data.hourly?.relativehumidity_2m ? data.hourly.relativehumidity_2m[0] : undefined,
+          windspeed: cw.windspeed,
+          isReal,
+          latitude: lat,
+          longitude: lon,
+        });
+        setWeatherError(null);
+      } else {
+        throw new Error('Formato de resposta inválido');
+      }
+    } catch {
+      setWeatherError('Erro de conexão com o serviço de clima.');
+    } finally {
+      setWeatherLoading(false);
+    }
+  };
+
+  const requestLocationPermission = () => {
+    setLocationPermission('requesting');
+    if (!navigator.geolocation) {
+      setLocationPermission('denied');
+      setWeatherError('Geolocalização não suportada por este navegador.');
+      fetchWeatherByCoords(-23.5489, -46.6388, false);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocationPermission('granted');
+        fetchWeatherByCoords(position.coords.latitude, position.coords.longitude, true);
+      },
+      () => {
+        setLocationPermission('denied');
+        fetchWeatherByCoords(-23.5489, -46.6388, false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  };
+
+  const renderWeatherIcon = (iconName: string | undefined) => {
+    switch (iconName) {
+      case 'Sun': return <Sun className="w-6 h-6 text-amber-400" />;
+      case 'CloudSun': return <CloudSun className="w-6 h-6 text-amber-300" />;
+      case 'CloudFog': return <CloudFog className="w-6 h-6 text-slate-300" />;
+      case 'CloudDrizzle': return <CloudDrizzle className="w-6 h-6 text-cyan-300" />;
+      case 'CloudRain': return <CloudRain className="w-6 h-6 text-cyan-400" />;
+      case 'CloudLightning': return <CloudLightning className="w-6 h-6 text-amber-400" />;
+      default: return <Cloud className="w-6 h-6 text-slate-300" />;
+    }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentDeviceTime(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    requestLocationPermission();
+    const weatherInterval = setInterval(() => {
+      if (weather) fetchWeatherByCoords(weather.latitude ?? -23.5489, weather.longitude ?? -46.6388, weather.isReal);
+    }, 15 * 60 * 1000);
+    return () => clearInterval(weatherInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleDeleteAccountConfirm = async () => {
     setFormLoading(true);
     setFormError('');
@@ -1037,6 +1341,92 @@ export default function Dashboard() {
       <NavBar dark />
 
       <div className="max-w-7xl mx-auto px-5 sm:px-8 py-10 w-full relative z-10 flex-1">
+        {/* Relógio, Data e Clima em Tempo Real (funciona em PC e Android — via navegador, sem precisar do app) */}
+        {profile && (
+          <div className="mb-6 bg-white/5 border border-white/10 rounded-3xl p-4 sm:p-5 backdrop-blur-xl">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              {/* Data e hora do dispositivo */}
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-signal-500/10 rounded-xl text-signal-400 shrink-0 flex flex-col items-center justify-center min-w-[64px]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-signal-400/80">
+                    {currentDeviceTime.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase()}
+                  </span>
+                  <span className="text-2xl font-black leading-none text-white mt-0.5">{currentDeviceTime.getDate()}</span>
+                  <span className="text-[9px] font-bold text-slate-400 mt-1">
+                    {currentDeviceTime.toLocaleDateString('pt-BR', { weekday: 'short' }).split('-')[0].toUpperCase()}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-400">Horário Sincronizado</h3>
+                  <div className="flex items-baseline gap-2 mt-0.5">
+                    <span className="text-2xl font-bold font-mono tracking-tight text-white">{formatTime(currentDeviceTime)}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">{formatDateLong(currentDeviceTime)}</p>
+                </div>
+              </div>
+
+              <div className="hidden lg:block h-12 w-px bg-white/10" />
+
+              {/* Clima via geolocalização do navegador */}
+              <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="p-2.5 bg-cyan-500/10 rounded-xl shrink-0">{renderWeatherIcon(weather?.icon)}</div>
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-lg font-bold text-white">
+                        {weatherLoading ? 'Atualizando…' : weather ? `${weather.temp}°C` : '--°C'}
+                      </span>
+                      <span className="text-xs font-medium text-slate-300 px-2 py-0.5 bg-white/10 rounded-full border border-white/10">
+                        {weatherLoading ? 'Consultando…' : weather?.condition || 'Sem previsão'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 mt-1 text-xs text-slate-400">
+                      <MapPin className={`w-3 h-3 ${weather?.isReal ? 'text-emerald-400' : 'text-slate-500'}`} />
+                      <span>{weather?.city || 'Buscando posição…'}</span>
+                      {weather?.humidity !== undefined && <span className="text-slate-500 ml-2">| Umidade: {weather.humidity}%</span>}
+                    </div>
+                    {weatherError && <p className="text-[11px] text-rose-400 mt-1">{weatherError}</p>}
+                  </div>
+                </div>
+
+                {/* Status de localização + indicação de dispositivo (PC ou Android, ambos via navegador) */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-[11px] font-semibold"
+                    title={isAndroidDevice ? 'Acessando pelo navegador do celular Android' : 'Acessando pelo navegador do computador'}
+                  >
+                    {isAndroidDevice ? <Smartphone className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
+                    <span>{isAndroidDevice ? 'Android (Web)' : 'PC (Web)'}</span>
+                  </div>
+                  {locationPermission === 'granted' ? (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/20 text-emerald-300 text-xs font-semibold">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Localização Ativa
+                    </div>
+                  ) : locationPermission === 'denied' ? (
+                    <button
+                      onClick={requestLocationPermission}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/20 hover:bg-amber-500/25 text-amber-300 text-xs font-semibold transition-all"
+                    >
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      Localização Bloqueada (Tentar de Novo)
+                    </button>
+                  ) : (
+                    <button
+                      onClick={requestLocationPermission}
+                      disabled={locationPermission === 'requesting'}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-signal-500/15 border border-signal-500/20 hover:bg-signal-500/25 text-signal-300 text-xs font-semibold transition-all disabled:opacity-60"
+                    >
+                      <MapPin className="w-3.5 h-3.5" />
+                      {locationPermission === 'requesting' ? 'Buscando…' : 'Ativar Localização'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header User Banner */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl">
           <div className="flex items-center gap-4">
@@ -1466,33 +1856,125 @@ export default function Dashboard() {
                       </button>
                     </div>
                     {tabLoading && <p className="text-sm text-slate-400">Carregando materiais…</p>}
-                    <div className="space-y-3 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                       {materials.map((m) => {
                         const low = m.acquired_quantity < m.needed_quantity;
+                        const matQuotes = supplierQuotes.filter((q) => q.material_id === m.id).sort((a, b) => a.unit_price - b.unit_price);
+                        const cheapest = matQuotes[0];
+                        const isQuoting = quotingMaterialId === m.id;
+                        const matReceipts = materialReceipts.filter((r) => r.material_id === m.id);
+                        const isAttaching = receiptMaterialId === m.id;
+                        const matForecast = getMaterialDepletionForecast(
+                          stockSnapshots.filter((s) => s.material_id === m.id).map((s) => ({ snapshot_date: s.snapshot_date, acquired_quantity: s.acquired_quantity }))
+                        );
+                        const showForecast = ['critico', 'atencao', 'esgotado'].includes(matForecast.status);
                         return (
-                          <div key={m.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div>
-                              <p className="font-bold text-white text-sm">{m.name}</p>
-                              {m.notes && <p className="text-xs text-slate-400">{m.notes}</p>}
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className={`text-sm font-bold font-mono ${low ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                {m.acquired_quantity} / {m.needed_quantity} {m.unit}
-                              </span>
-                              <div className="flex items-center gap-1">
+                          <div key={m.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div>
+                                <p className="font-bold text-white text-sm">{m.name}</p>
+                                {m.notes && <p className="text-xs text-slate-400">{m.notes}</p>}
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className={`text-sm font-bold font-mono ${low ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                  {m.acquired_quantity} / {m.needed_quantity} {m.unit}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => handleRestockMaterial(m, -10)} className="w-7 h-7 rounded-lg bg-white/10 border border-white/10 text-slate-300 hover:text-white text-[10px] font-bold">-10</button>
+                                  <button onClick={() => handleRestockMaterial(m, -1)} className="w-7 h-7 rounded-lg bg-white/10 border border-white/10 text-slate-300 hover:text-white text-sm font-bold">−</button>
+                                  <button onClick={() => handleRestockMaterial(m, 1)} className="w-7 h-7 rounded-lg bg-white/10 border border-white/10 text-slate-300 hover:text-white text-sm font-bold">+</button>
+                                  <button onClick={() => handleRestockMaterial(m, 10)} className="w-7 h-7 rounded-lg bg-white/10 border border-white/10 text-slate-300 hover:text-white text-[10px] font-bold">+10</button>
+                                </div>
                                 <button
-                                  onClick={() => handleRestockMaterial(m, -1)}
-                                  className="w-7 h-7 rounded-lg bg-white/10 border border-white/10 text-slate-300 hover:text-white text-sm font-bold"
+                                  onClick={() => handleDeleteMaterial(m)}
+                                  title="Excluir suprimento"
+                                  className="w-7 h-7 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 hover:bg-rose-500/20 flex items-center justify-center"
                                 >
-                                  −
-                                </button>
-                                <button
-                                  onClick={() => handleRestockMaterial(m, 1)}
-                                  className="w-7 h-7 rounded-lg bg-white/10 border border-white/10 text-slate-300 hover:text-white text-sm font-bold"
-                                >
-                                  +
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
+                            </div>
+
+                            {showForecast && (
+                              <p className={`text-[11px] font-semibold flex items-center gap-1 ${matForecast.status === 'atencao' ? 'text-amber-300' : 'text-rose-300'}`}>
+                                <ShieldAlert className="w-3 h-3 shrink-0" />
+                                {matForecast.status === 'esgotado' ? 'Estoque esgotado.' : `No ritmo atual, acaba em ${matForecast.daysToEmpty} dia${matForecast.daysToEmpty === 1 ? '' : 's'}.`}
+                              </p>
+                            )}
+
+                            {/* Cotação de fornecedores */}
+                            <div className="pt-2 border-t border-white/10 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold text-slate-400 uppercase">Cotações de Fornecedor</span>
+                                <button onClick={() => setQuotingMaterialId(isQuoting ? null : m.id)} className="text-[11px] font-bold text-signal-400 hover:underline">
+                                  {isQuoting ? 'Fechar' : '+ Cotação'}
+                                </button>
+                              </div>
+                              {matQuotes.length > 0 && (
+                                <div className="space-y-1.5">
+                                  {matQuotes.map((q) => {
+                                    const isCheapest = cheapest && q.id === cheapest.id;
+                                    return (
+                                      <div key={q.id} className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs ${isCheapest ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-white/5 border border-white/10'}`}>
+                                        <span className={isCheapest ? 'text-emerald-300 font-semibold' : 'text-slate-300'}>
+                                          {isCheapest && '✓ '}{q.supplier_name} · {currency(q.unit_price)}/{m.unit}
+                                        </span>
+                                        <button onClick={() => handleDeleteSupplierQuote(q.id)} className="text-slate-500 hover:text-rose-300">
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              {isQuoting && (
+                                <form onSubmit={(e) => handleCreateSupplierQuote(e, m.id)} className="flex flex-wrap items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-2">
+                                  <input type="text" placeholder="Fornecedor" value={newQuoteSupplier} onChange={(e) => setNewQuoteSupplier(e.target.value)} className="flex-1 min-w-[7rem] px-2 py-1.5 rounded bg-white/5 border border-white/10 text-white text-xs" required />
+                                  <input type="number" step="0.01" min="0" placeholder={`R$/${m.unit}`} value={newQuotePrice} onChange={(e) => setNewQuotePrice(e.target.value)} className="w-20 px-2 py-1.5 rounded bg-white/5 border border-white/10 text-white text-xs" required />
+                                  <button type="submit" className="px-3 py-1.5 bg-signal-500 text-white rounded text-xs font-bold">Salvar</button>
+                                </form>
+                              )}
+                            </div>
+
+                            {/* Notas fiscais / comprovantes */}
+                            <div className="pt-2 border-t border-white/10 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold text-slate-400 uppercase">Notas Fiscais ({matReceipts.length})</span>
+                                <button onClick={() => setReceiptMaterialId(isAttaching ? null : m.id)} className="text-[11px] font-bold text-signal-400 hover:underline">
+                                  {isAttaching ? 'Fechar' : '+ Anexar'}
+                                </button>
+                              </div>
+                              {matReceipts.length > 0 && (
+                                <div className="grid grid-cols-3 gap-2">
+                                  {matReceipts.map((r) => (
+                                    <div key={r.id} className="relative">
+                                      <img src={r.photo} alt="Comprovante" className="h-16 w-full object-cover rounded-lg border border-white/10" />
+                                      <span className="block text-[10px] font-bold text-white mt-0.5">{currency(r.amount)}</span>
+                                      <button onClick={() => handleDeleteMaterialReceipt(r.id)} className="absolute top-1 right-1 bg-rose-500 text-white rounded-full p-0.5">
+                                        <X className="w-2.5 h-2.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {isAttaching && (
+                                <form onSubmit={(e) => handleCreateMaterialReceipt(e, m.id)} className="bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleReceiptPhotoSelect(f); }}
+                                    className="w-full text-xs text-slate-300"
+                                    required
+                                  />
+                                  {uploadingReceipt && <p className="text-[11px] text-slate-400">Enviando imagem…</p>}
+                                  {newReceiptPhoto && <img src={newReceiptPhoto} alt="Prévia" className="h-14 rounded-lg object-cover border border-white/10" />}
+                                  <div className="flex items-center gap-2">
+                                    <input type="number" step="0.01" min="0" placeholder="Valor (R$)" value={newReceiptAmount} onChange={(e) => setNewReceiptAmount(e.target.value)} className="flex-1 px-2 py-1.5 rounded bg-white/5 border border-white/10 text-white text-xs" required />
+                                    <input type="date" value={newReceiptDate} onChange={(e) => setNewReceiptDate(e.target.value)} className="px-2 py-1.5 rounded bg-white/5 border border-white/10 text-white text-xs" />
+                                  </div>
+                                  <button type="submit" disabled={uploadingReceipt || !newReceiptPhoto} className="w-full px-3 py-1.5 bg-signal-500 text-white rounded text-xs font-bold disabled:opacity-50">Salvar Comprovante</button>
+                                </form>
+                              )}
                             </div>
                           </div>
                         );
@@ -1537,17 +2019,22 @@ export default function Dashboard() {
                           <div key={i.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
                             <div className="flex items-center justify-between text-xs font-mono">
                               <span className="text-cyan-300 font-bold">{new Date(i.occurred_at).toLocaleDateString('pt-BR')} · {i.type}</span>
-                              <span
-                                className={`px-2 py-0.5 rounded-full border font-bold uppercase ${
-                                  i.severity === 'grave'
-                                    ? 'bg-rose-500/20 border-rose-500/30 text-rose-300'
-                                    : i.severity === 'moderada'
-                                    ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
-                                    : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
-                                }`}
-                              >
-                                {i.severity}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`px-2 py-0.5 rounded-full border font-bold uppercase ${
+                                    i.severity === 'grave'
+                                      ? 'bg-rose-500/20 border-rose-500/30 text-rose-300'
+                                      : i.severity === 'moderada'
+                                      ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+                                      : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                                  }`}
+                                >
+                                  {i.severity}
+                                </span>
+                                <button onClick={() => handleDeleteIncident(i.id)} title="Excluir ocorrência" className="text-slate-500 hover:text-rose-300">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                             <p className="text-sm text-slate-200">{i.description}</p>
                             {i.action_taken && <p className="text-xs text-slate-400">Ação tomada: {i.action_taken}</p>}
@@ -1573,10 +2060,19 @@ export default function Dashboard() {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                       {members.map((m) => (
-                        <div key={m.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                          <p className="font-bold text-white text-sm">{m.profiles?.full_name || 'Sem nome'}</p>
-                          <p className="text-xs text-signal-400 font-mono font-semibold uppercase">{m.project_role}</p>
-                          {m.profiles?.phone && <p className="text-xs text-slate-400">{m.profiles.phone}</p>}
+                        <div key={m.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-start justify-between gap-2">
+                          <div className="space-y-1">
+                            <p className="font-bold text-white text-sm">{m.profiles?.full_name || 'Sem nome'}</p>
+                            <p className="text-xs text-signal-400 font-mono font-semibold uppercase">{m.project_role}</p>
+                            {m.profiles?.phone && <p className="text-xs text-slate-400">{m.profiles.phone}</p>}
+                          </div>
+                          <button
+                            onClick={() => handleDeleteMember(m.id)}
+                            title="Remover da obra"
+                            className="w-7 h-7 shrink-0 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 hover:bg-rose-500/20 flex items-center justify-center"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -1605,9 +2101,18 @@ export default function Dashboard() {
                               {os.company_name} · Valor M.O.: {currency(os.labor_value)}
                             </p>
                           </div>
-                          <span className="px-3 py-1 rounded-full bg-signal-500/20 border border-signal-500/30 text-signal-300 text-xs font-mono font-bold uppercase self-start sm:self-auto">
-                            {os.status}
-                          </span>
+                          <div className="flex items-center gap-2 self-start sm:self-auto">
+                            <span className="px-3 py-1 rounded-full bg-signal-500/20 border border-signal-500/30 text-signal-300 text-xs font-mono font-bold uppercase">
+                              {os.status}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteServiceOrder(os.id)}
+                              title="Excluir OS"
+                              className="w-7 h-7 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 hover:bg-rose-500/20 flex items-center justify-center"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1725,6 +2230,41 @@ export default function Dashboard() {
                         </div>
                       </div>
 
+                      {/* Orçamento: Previsto x Realizado por categoria */}
+                      <div className="p-5 sm:p-6 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                        <h3 className="text-base font-bold text-white">Orçamento: Previsto x Realizado</h3>
+                        {budget.length === 0 && <p className="text-sm text-slate-400 text-center py-4">Nenhuma categoria de orçamento cadastrada ainda.</p>}
+                        <div className="space-y-3">
+                          {budget.map((item) => {
+                            const pct = item.planned_value > 0 ? Math.min(100, (item.actual_value / item.planned_value) * 100) : 0;
+                            const over = item.actual_value > item.planned_value;
+                            return (
+                              <div key={item.id} className="p-3.5 rounded-xl bg-white/5 border border-white/10">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="text-sm font-bold text-white">{item.category}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-xs font-bold font-mono ${over ? 'text-rose-400' : 'text-slate-300'}`}>
+                                      {currency(item.actual_value)} / {currency(item.planned_value)}
+                                    </span>
+                                    <button onClick={() => handleDeleteBudgetItem(item.id)} className="text-slate-500 hover:text-rose-300">
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                                  <div className={`h-full rounded-full transition-all duration-500 ${over ? 'bg-rose-500' : 'bg-signal-500'}`} style={{ width: `${pct}%` }} />
+                                </div>
+                                {over && (
+                                  <span className="text-[11px] text-rose-300 font-semibold mt-1 block">
+                                    Estourou o orçamento em {currency(item.actual_value - item.planned_value)}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       {/* Custo por m² Construído */}
                       <div className="p-5 sm:p-6 rounded-2xl bg-white/5 border border-white/10 space-y-4">
                         <h3 className="text-base font-bold text-white">Custo por m² Construído</h3>
@@ -1830,9 +2370,14 @@ export default function Dashboard() {
                           {cashFlow.map((c) => (
                             <div key={c.id} className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs font-mono">
                               <span>{c.description}</span>
-                              <span className={`font-bold ${c.type === 'entrada' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                {c.type === 'entrada' ? '+' : '-'} {currency(c.amount)}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={`font-bold ${c.type === 'entrada' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                  {c.type === 'entrada' ? '+' : '-'} {currency(c.amount)}
+                                </span>
+                                <button onClick={() => handleDeleteCashFlow(c.id)} title="Excluir lançamento" className="text-slate-500 hover:text-rose-300">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1858,6 +2403,9 @@ export default function Dashboard() {
                                 >
                                   {p.status}
                                 </span>
+                                <button onClick={() => handleDeletePayment(p.id)} title="Excluir pagamento" className="text-slate-500 hover:text-rose-300">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             </div>
                           ))}
@@ -2267,21 +2815,61 @@ export default function Dashboard() {
       )}
 
       {showNewOS && (
-        <Modal title="Nova Ordem de Serviço" onClose={() => setShowNewOS(false)}>
+        <Modal title="Nova Ordem de Serviço" onClose={() => { setShowNewOS(false); setOsForm(emptyOsForm()); }}>
           <form onSubmit={handleCreateServiceOrder} className="space-y-4">
             {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+
+            <h4 className="text-xs font-mono font-bold uppercase text-slate-400 pt-1">Empresa Executora</h4>
             <div className="space-y-1">
-              <label className={labelClass}>Empresa Executora</label>
+              <label className={labelClass}>Nome da Empresa</label>
               <input required value={osForm.company_name} onChange={(e) => setOsForm({ ...osForm, company_name: e.target.value })} className={inputClass} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={labelClass}>CNPJ</label>
+                <input value={osForm.company_cnpj} onChange={(e) => setOsForm({ ...osForm, company_cnpj: e.target.value })} className={inputClass} />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Contato da Empresa</label>
+                <input value={osForm.company_contact} onChange={(e) => setOsForm({ ...osForm, company_contact: e.target.value })} className={inputClass} />
+              </div>
+            </div>
             <div className="space-y-1">
-              <label className={labelClass}>Cliente</label>
+              <label className={labelClass}>Responsável Técnico</label>
+              <input value={osForm.company_responsible} onChange={(e) => setOsForm({ ...osForm, company_responsible: e.target.value })} className={inputClass} />
+            </div>
+
+            <h4 className="text-xs font-mono font-bold uppercase text-slate-400 pt-2 border-t border-white/10">Cliente</h4>
+            <div className="space-y-1">
+              <label className={labelClass}>Nome do Cliente</label>
               <input required value={osForm.client_name} onChange={(e) => setOsForm({ ...osForm, client_name: e.target.value })} className={inputClass} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
+                <label className={labelClass}>CPF/CNPJ do Cliente</label>
+                <input value={osForm.client_document} onChange={(e) => setOsForm({ ...osForm, client_document: e.target.value })} className={inputClass} />
+              </div>
+              <div className="space-y-1">
                 <label className={labelClass}>Telefone do Cliente</label>
                 <input value={osForm.client_phone} onChange={(e) => setOsForm({ ...osForm, client_phone: e.target.value })} className={inputClass} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={labelClass}>E-mail do Cliente</label>
+                <input type="email" value={osForm.client_email} onChange={(e) => setOsForm({ ...osForm, client_email: e.target.value })} className={inputClass} />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Endereço do Cliente</label>
+                <input value={osForm.client_address} onChange={(e) => setOsForm({ ...osForm, client_address: e.target.value })} className={inputClass} />
+              </div>
+            </div>
+
+            <h4 className="text-xs font-mono font-bold uppercase text-slate-400 pt-2 border-t border-white/10">Prazos & Execução</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={labelClass}>Data de Início</label>
+                <input type="date" value={osForm.start_date} onChange={(e) => setOsForm({ ...osForm, start_date: e.target.value })} className={inputClass} />
               </div>
               <div className="space-y-1">
                 <label className={labelClass}>Prazo</label>
@@ -2297,9 +2885,69 @@ export default function Dashboard() {
               <textarea rows={2} value={osForm.execution_description} onChange={(e) => setOsForm({ ...osForm, execution_description: e.target.value })} className={inputClass} />
             </div>
             <div className="space-y-1">
-              <label className={labelClass}>Valor da Mão de Obra (R$)</label>
-              <input type="number" min={0} value={osForm.labor_value} onChange={(e) => setOsForm({ ...osForm, labor_value: e.target.value })} className={inputClass} />
+              <label className={labelClass}>Equipe Alocada (nomes)</label>
+              <input value={osForm.team_names} onChange={(e) => setOsForm({ ...osForm, team_names: e.target.value })} className={inputClass} placeholder="Ex: João, Carlos, Marcos" />
             </div>
+
+            <h4 className="text-xs font-mono font-bold uppercase text-slate-400 pt-2 border-t border-white/10">Materiais / Insumos</h4>
+            <div className="space-y-2">
+              {osForm.materials.length > 0 && (
+                <div className="space-y-1.5">
+                  {osForm.materials.map((m, idx) => (
+                    <div key={idx} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs">
+                      <span className="text-slate-200">{m.name} · {m.quantity} un.</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400 font-mono">{currency(m.quantity * m.unit_price)}</span>
+                        <button type="button" onClick={() => removeOsMaterial(idx)} className="text-slate-500 hover:text-rose-300">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  placeholder="Material"
+                  value={osMaterialDraft.name}
+                  onChange={(e) => setOsMaterialDraft({ ...osMaterialDraft, name: e.target.value })}
+                  className={`${inputClass} flex-1 min-w-[8rem]`}
+                />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Qtd"
+                  value={osMaterialDraft.quantity}
+                  onChange={(e) => setOsMaterialDraft({ ...osMaterialDraft, quantity: e.target.value })}
+                  className={`${inputClass} w-20`}
+                />
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="R$ unit."
+                  value={osMaterialDraft.unit_price}
+                  onChange={(e) => setOsMaterialDraft({ ...osMaterialDraft, unit_price: e.target.value })}
+                  className={`${inputClass} w-24`}
+                />
+                <button type="button" onClick={addOsMaterial} className="px-3 py-2.5 rounded-xl bg-white/10 border border-white/10 text-white text-xs font-bold hover:bg-white/20">
+                  + Add
+                </button>
+              </div>
+            </div>
+
+            <h4 className="text-xs font-mono font-bold uppercase text-slate-400 pt-2 border-t border-white/10">Pagamento</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={labelClass}>Valor da Mão de Obra (R$)</label>
+                <input type="number" min={0} value={osForm.labor_value} onChange={(e) => setOsForm({ ...osForm, labor_value: e.target.value })} className={inputClass} />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Forma de Pagamento</label>
+                <input value={osForm.payment_method} onChange={(e) => setOsForm({ ...osForm, payment_method: e.target.value })} className={inputClass} placeholder="Ex: Pix, Boleto" />
+              </div>
+            </div>
+
             <SubmitButton loading={formLoading}>Criar Ordem de Serviço</SubmitButton>
           </form>
         </Modal>
