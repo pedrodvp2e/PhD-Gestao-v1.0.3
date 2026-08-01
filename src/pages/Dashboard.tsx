@@ -219,94 +219,6 @@ const weatherLabel: Record<string, string> = {
   tempestade: '⛈️ Tempestade',
 };
 
-const MOCK_PROJECTS: Project[] = [
-  {
-    id: 'proj-1',
-    name: 'Residencial Alphaville - Bloco A',
-    client_name: 'Alphaville Urbanismo',
-    address: 'Av. das Nações, 1500 - Barueri/SP',
-    status: 'Em andamento',
-    start_date: '2026-01-10',
-    deadline: '2026-11-30',
-    progress: 42,
-  },
-  {
-    id: 'proj-2',
-    name: 'Edifício Horizon Tower',
-    client_name: 'Incorporadora Horizon',
-    address: 'Rua Bela Cintra, 890 - São Paulo/SP',
-    status: 'Em andamento',
-    start_date: '2026-03-01',
-    deadline: '2027-02-28',
-    progress: 18,
-  },
-];
-
-const MOCK_TASKS: Task[] = [
-  { id: 't1', title: 'Concretagem da Laje do 3º Pavimento', category: 'Estrutura', status: 'Em andamento', progress: 75, deadline: '2026-08-05' },
-  { id: 't2', title: 'Instalação da Tubulação Hidráulica Prumada', category: 'Instalações', status: 'Pendente', progress: 20, deadline: '2026-08-15' },
-  { id: 't3', title: 'Alvenaria de Vedação 2º Pavimento', category: 'Alvenaria', status: 'Concluído', progress: 100, deadline: '2026-07-28' },
-  { id: 't4', title: 'Chapisco e Emboço Fachada Leste', category: 'Acabamento', status: 'Em andamento', progress: 40, deadline: '2026-08-20' },
-];
-
-const MOCK_DIARY: DiaryEntry[] = [
-  { id: 'd1', entry_date: '2026-07-30', weather: 'sol', workers_count: 24, description: 'Finalizada armação da laje L3. Recebimento de 12m³ de concreto USINADO.', occurrences: 'Caminhão betoneira chegou com 20 min de atraso, sem impacto na concretagem.' },
-  { id: 'd2', entry_date: '2026-07-29', weather: 'nublado', workers_count: 22, description: 'Continuação da elevação de alvenaria e assentamento de blocos cerâmicos no 2º andar.', occurrences: null },
-];
-
-const MOCK_MATERIALS: MaterialRow[] = [
-  { id: 'm1', name: 'Cimento CP II-Z 50kg', unit: 'sacos', needed_quantity: 500, acquired_quantity: 320, notes: 'Uso estrutural e acabamento' },
-  { id: 'm2', name: 'Aço CA-50 10.0mm', unit: 'kg', needed_quantity: 2500, acquired_quantity: 2100, notes: 'Armação de vigas e pilares' },
-  { id: 'm3', name: 'Areia Média Lavada', unit: 'm³', needed_quantity: 120, acquired_quantity: 45, notes: 'Estoque baixo - solicitar compra' },
-  { id: 'm4', name: 'Bloco Cerâmico 14x19x29', unit: 'unid', needed_quantity: 8000, acquired_quantity: 7500, notes: 'Entregue pelo fornecedor Silva' },
-];
-
-const MOCK_SAFETY: SafetyItem[] = [
-  { id: 's1', label: 'Uso obrigatório de EPI (Capacete, Bota e Óculos)', completed: true },
-  { id: 's2', label: 'Cinto de Segurança tipo Paratuedas para Trabalho em Altura', completed: true },
-  { id: 's3', label: 'Telas de Proteção e Guarda-Corpo nos Perímetros', completed: true },
-  { id: 's4', label: 'Sinalização e Isolamento da Área do Guincho de Carga', completed: false },
-];
-
-const MOCK_INCIDENTS: Incident[] = [
-  { id: 'i1', occurred_at: '2026-07-22', type: 'Aviso de Segurança', severity: 'Leve', description: 'Trabalhador sem luvas de raspa durante manuseio de vergalhões.', injured_person: null, action_taken: 'Orientação imediata pelo TST e fornecimento de novas luvas.' },
-];
-
-const MOCK_MEMBERS: MemberRow[] = [
-  { id: 'mb1', project_role: 'Engenheiro Residente', profiles: { full_name: 'Pedro Danelon', phone: '(11) 98765-4321', member_code: 'ENG-001' } },
-  { id: 'mb2', project_role: 'Mestre de Obras', profiles: { full_name: 'Antônio Carlos', phone: '(11) 97654-3210', member_code: 'MST-002' } },
-  { id: 'mb3', project_role: 'Técnico de Segurança', profiles: { full_name: 'Mariana Lima', phone: '(11) 96543-2109', member_code: 'TST-003' } },
-];
-
-const MOCK_SERVICE_ORDERS: ServiceOrder[] = [
-  { id: 'os1', os_number: 'OS-2026-014', status: 'Aprovada', client_name: 'Alphaville Urbanismo', company_name: 'PHD Construtora', issued_at: '2026-07-15', deadline: '2026-08-15', labor_value: 45000 },
-  { id: 'os2', os_number: 'OS-2026-015', status: 'Em Execução', client_name: 'Alphaville Urbanismo', company_name: 'Elétrica S/A', issued_at: '2026-07-20', deadline: '2026-08-30', labor_value: 28000 },
-];
-
-const MOCK_MESSAGES: ChatMessage[] = [
-  { id: 'msg1', content: 'Bom dia pessoal! Concretagem da laje confirmada para as 08:00.', attachment_type: null, created_at: '2026-07-30T07:30:00Z', profiles: { full_name: 'Pedro Danelon' } },
-  { id: 'msg2', content: 'Caminhões betoneira já estão posicionados no canteiro.', attachment_type: null, created_at: '2026-07-30T08:05:00Z', profiles: { full_name: 'Antônio Carlos' } },
-  { id: 'msg3', content: 'Registro fotográfico da armação enviado pro relatório diário.', attachment_type: 'image', created_at: '2026-07-30T09:15:00Z', profiles: { full_name: 'Mariana Lima' } },
-];
-
-const MOCK_BUDGET: BudgetItem[] = [
-  { id: 'b1', category: 'Estrutura & Fundação', planned_value: 350000, actual_value: 290000 },
-  { id: 'b2', category: 'Alvenaria & Vedações', planned_value: 120000, actual_value: 95000 },
-  { id: 'b3', category: 'Instalações Elétricas & Hidráulicas', planned_value: 180000, actual_value: 110000 },
-  { id: 'b4', category: 'Acabamentos e Revestimentos', planned_value: 220000, actual_value: 45000 },
-];
-
-const MOCK_CASH_FLOW: CashFlowEntry[] = [
-  { id: 'cf1', entry_date: '2026-07-28', type: 'entrada', description: 'Medição 3 - Construtora Alphaville', amount: 150000 },
-  { id: 'cf2', entry_date: '2026-07-25', type: 'saida', description: 'Pagamento Concreto Usinado - Votorantim', amount: 38000 },
-  { id: 'cf3', entry_date: '2026-07-20', type: 'saida', description: 'Folha de Pagamento Empreiteira de Armação', amount: 24500 },
-];
-
-const MOCK_PAYMENTS: Payment[] = [
-  { id: 'p1', payee_name: 'Votorantim Cimentos', payee_type: 'Fornecedor', amount: 38000, due_date: '2026-07-25', paid_date: '2026-07-25', status: 'Pago' },
-  { id: 'p2', payee_name: 'Gerdau Aços', payee_type: 'Fornecedor', amount: 42000, due_date: '2026-08-10', paid_date: null, status: 'Pendente' },
-];
-
 export default function Dashboard() {
   const { profile, isPremium, user, signOut, deleteAccount, refreshProfile } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -413,10 +325,6 @@ export default function Dashboard() {
         // Fallback para mock
       }
 
-      if (loadedProjects.length === 0) {
-        loadedProjects = MOCK_PROJECTS;
-      }
-
       setProjects(loadedProjects);
       if (loadedProjects.length > 0) setSelectedId(loadedProjects[0].id);
       setLoading(false);
@@ -457,13 +365,13 @@ export default function Dashboard() {
             if (tRes && tRes.length > 0) taskList = tRes as Task[];
             if (incRes && incRes.length > 0) incList = incRes as Incident[];
           } catch {}
-          setMaterials(mats.length > 0 ? mats : MOCK_MATERIALS);
-          setMembers(memList.length > 0 ? memList : MOCK_MEMBERS);
-          setBudget(bList.length > 0 ? bList : MOCK_BUDGET);
-          setCashFlow(cfList.length > 0 ? cfList : MOCK_CASH_FLOW);
-          setPayments(payList.length > 0 ? payList : MOCK_PAYMENTS);
+          setMaterials(mats);
+          setMembers(memList);
+          setBudget(bList);
+          setCashFlow(cfList);
+          setPayments(payList);
           setProgressSnapshots(snapList);
-          setTasks(taskList.length > 0 ? taskList : MOCK_TASKS);
+          setTasks(taskList);
           setIncidents(incList.length > 0 ? incList : []);
           break;
         }
@@ -477,7 +385,7 @@ export default function Dashboard() {
               .order('deadline', { ascending: true });
             if (data && data.length > 0) list = data as Task[];
           } catch {}
-          setTasks(list.length > 0 ? list : MOCK_TASKS);
+          setTasks(list);
           break;
         }
         case 'diario': {
@@ -490,7 +398,7 @@ export default function Dashboard() {
               .order('entry_date', { ascending: false });
             if (data && data.length > 0) list = data as DiaryEntry[];
           } catch {}
-          setDiary(list.length > 0 ? list : MOCK_DIARY);
+          setDiary(list);
           break;
         }
         case 'materiais': {
@@ -510,7 +418,7 @@ export default function Dashboard() {
             if (mRes && mRes.length > 0) mats = mRes as MaterialRow[];
             if (sRes && sRes.length > 0) snaps = sRes as MaterialStockSnapshot[];
           } catch {}
-          setMaterials(mats.length > 0 ? mats : MOCK_MATERIALS);
+          setMaterials(mats);
           setStockSnapshots(snaps);
           break;
         }
@@ -532,8 +440,8 @@ export default function Dashboard() {
             if (itemRes && itemRes.length > 0) items = itemRes as SafetyItem[];
             if (incRes && incRes.length > 0) incs = incRes as Incident[];
           } catch {}
-          setSafetyItems(items.length > 0 ? items : MOCK_SAFETY);
-          setIncidents(incs.length > 0 ? incs : MOCK_INCIDENTS);
+          setSafetyItems(items);
+          setIncidents(incs);
           break;
         }
         case 'equipe': {
@@ -545,7 +453,7 @@ export default function Dashboard() {
               .eq('project_id', selectedId);
             if (data && data.length > 0) list = data as unknown as MemberRow[];
           } catch {}
-          setMembers(list.length > 0 ? list : MOCK_MEMBERS);
+          setMembers(list);
           break;
         }
         case 'os': {
@@ -558,7 +466,7 @@ export default function Dashboard() {
               .order('issued_at', { ascending: false });
             if (data && data.length > 0) list = data as ServiceOrder[];
           } catch {}
-          setServiceOrders(list.length > 0 ? list : MOCK_SERVICE_ORDERS);
+          setServiceOrders(list);
           break;
         }
         case 'chat': {
@@ -572,7 +480,7 @@ export default function Dashboard() {
               .limit(50);
             if (data && data.length > 0) list = data as unknown as ChatMessage[];
           } catch {}
-          setMessages(list.length > 0 ? list : MOCK_MESSAGES);
+          setMessages(list);
           break;
         }
         case 'financeiro': {
@@ -596,9 +504,9 @@ export default function Dashboard() {
             if (cf && cf.length > 0) cfList = cf as CashFlowEntry[];
             if (pay && pay.length > 0) payList = pay as Payment[];
           } catch {}
-          setBudget(bList.length > 0 ? bList : MOCK_BUDGET);
-          setCashFlow(cfList.length > 0 ? cfList : MOCK_CASH_FLOW);
-          setPayments(payList.length > 0 ? payList : MOCK_PAYMENTS);
+          setBudget(bList);
+          setCashFlow(cfList);
+          setPayments(payList);
           break;
         }
       }
@@ -1217,6 +1125,24 @@ export default function Dashboard() {
 
           {/* Main Content Pane */}
           <main className="lg:col-span-9 space-y-6">
+            {!loading && projects.length === 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-3xl p-10 sm:p-16 backdrop-blur-xl text-center space-y-4">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-signal-500/20 border border-signal-500/30 flex items-center justify-center text-signal-400">
+                  <Building2 className="w-7 h-7" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Nenhuma obra cadastrada ainda</h3>
+                <p className="text-sm text-slate-400 max-w-md mx-auto">
+                  Cadastre sua primeira obra para começar a acompanhar cronograma, materiais, equipe e financeiro.
+                </p>
+                <button
+                  onClick={() => setShowNewProject(true)}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-signal-500 hover:bg-signal-400 text-white font-extrabold text-sm shadow-xl shadow-signal-500/20 transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Cadastrar Primeira Obra</span>
+                </button>
+              </div>
+            )}
             {selectedProject && (
               <div className="space-y-6">
                 {/* Tabs Navigation Bar */}
@@ -1339,105 +1265,6 @@ export default function Dashboard() {
                           </div>
                         </div>
                       )}
-                    </div>
-
-                    {/* Custo por m² Construído */}
-                    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
-                      <h3 className="text-lg font-bold text-white">Custo por m² Construído</h3>
-                      <div className="flex flex-wrap items-end gap-3">
-                        <div className="space-y-1">
-                          <label className={labelClass}>Área construída (m²)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min={0}
-                            defaultValue={selectedProject.built_area_m2 ?? ''}
-                            onBlur={(e) => handleUpdateProjectArea(e.target.value ? Number(e.target.value) : null)}
-                            placeholder="Ex: 250"
-                            className={`${inputClass} w-40`}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-[180px] p-4 rounded-2xl bg-white/5 border border-white/10">
-                          <span className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Custo por m²</span>
-                          <span className="text-lg font-bold text-white font-mono">
-                            {selectedProject.built_area_m2 && selectedProject.built_area_m2 > 0
-                              ? currency(
-                                  (totalActual + payments.filter((p) => p.status?.toLowerCase() === 'pago').reduce((s, p) => s + (p.amount || 0), 0)) /
-                                    selectedProject.built_area_m2
-                                )
-                              : '— informe a área'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Curva S: Físico x Financeiro */}
-                    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="text-lg font-bold text-white">Curva S: Físico x Financeiro</h3>
-                        <button
-                          onClick={handleRecordProgressSnapshot}
-                          className="text-xs font-extrabold px-3 py-2 rounded-xl bg-amber-500 text-amber-950 hover:bg-amber-400 transition-all"
-                        >
-                          + Registrar Ponto de Hoje
-                        </button>
-                      </div>
-
-                      {(() => {
-                        const sorted = [...progressSnapshots].sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
-                        const latest = sorted[sorted.length - 1];
-                        const diff = latest ? latest.financial_progress - latest.physical_progress : null;
-                        const chartData = sorted.map((s) => ({
-                          data: new Date(s.snapshot_date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
-                          'Progresso Físico (%)': s.physical_progress,
-                          'Progresso Financeiro (%)': s.financial_progress,
-                        }));
-                        return (
-                          <>
-                            {diff !== null && (
-                              <div
-                                className={`p-3.5 rounded-2xl border text-xs font-semibold ${
-                                  diff > 10
-                                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-200'
-                                    : diff > 0
-                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
-                                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
-                                }`}
-                              >
-                                {diff > 10 &&
-                                  `Atenção: a obra já gastou ${diff.toFixed(1)} pontos percentuais a mais do orçamento do que avançou fisicamente.`}
-                                {diff > 0 && diff <= 10 && `A obra está gastando um pouco mais rápido (${diff.toFixed(1)} p.p.) do que constrói.`}
-                                {diff <= 0 && `Positivo: a obra está construindo mais rápido (${Math.abs(diff).toFixed(1)} p.p.) do que está gastando do orçamento.`}
-                              </div>
-                            )}
-                            {chartData.length === 0 ? (
-                              <p className="text-sm text-slate-400 text-center py-8">
-                                Nenhum ponto registrado ainda. Clique em "Registrar Ponto de Hoje" (o ideal é uma vez por mês) para começar a montar a curva desta obra.
-                              </p>
-                            ) : (
-                              <div className="w-full h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <LineChart data={chartData} margin={{ top: 5, right: 8, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                                    <XAxis dataKey="data" tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                                    <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} unit="%" />
-                                    <Tooltip
-                                      formatter={(v: number) => `${v.toFixed(1)}%`}
-                                      contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
-                                    />
-                                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                                    <Line type="monotone" dataKey="Progresso Físico (%)" stroke="#38bdf8" strokeWidth={2} dot={{ r: 3 }} />
-                                    <Line type="monotone" dataKey="Progresso Financeiro (%)" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
-                                  </LineChart>
-                                </ResponsiveContainer>
-                              </div>
-                            )}
-                            <p className="text-[11px] text-slate-500 leading-relaxed">
-                              Progresso Físico = % de avanço da obra. Progresso Financeiro = % do orçamento total já gasto (categorias + pagamentos pagos).
-                            </p>
-                          </>
-                        );
-                      })()}
                     </div>
 
                     {/* Suprimentos Críticos, Avisos e Equipe */}
@@ -1896,6 +1723,105 @@ export default function Dashboard() {
                           <span className="text-xs text-slate-400 font-mono">Orçamento Executado</span>
                           <span className="block text-2xl font-extrabold text-cyan-400 font-mono">{currency(totalActual)}</span>
                         </div>
+                      </div>
+
+                      {/* Custo por m² Construído */}
+                      <div className="p-5 sm:p-6 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                        <h3 className="text-base font-bold text-white">Custo por m² Construído</h3>
+                        <div className="flex flex-wrap items-end gap-3">
+                          <div className="space-y-1">
+                            <label className={labelClass}>Área construída (m²)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min={0}
+                              defaultValue={selectedProject.built_area_m2 ?? ''}
+                              onBlur={(e) => handleUpdateProjectArea(e.target.value ? Number(e.target.value) : null)}
+                              placeholder="Ex: 250"
+                              className={`${inputClass} w-40`}
+                            />
+                          </div>
+                          <div className="flex-1 min-w-[180px] p-4 rounded-2xl bg-white/5 border border-white/10">
+                            <span className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Custo por m²</span>
+                            <span className="text-lg font-bold text-white font-mono">
+                              {selectedProject.built_area_m2 && selectedProject.built_area_m2 > 0
+                                ? currency(
+                                    (totalActual + payments.filter((p) => p.status?.toLowerCase() === 'pago').reduce((s, p) => s + (p.amount || 0), 0)) /
+                                      selectedProject.built_area_m2
+                                  )
+                                : '— informe a área'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Curva S: Físico x Financeiro */}
+                      <div className="p-5 sm:p-6 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h3 className="text-base font-bold text-white">Curva S: Físico x Financeiro</h3>
+                          <button
+                            onClick={handleRecordProgressSnapshot}
+                            className="text-xs font-extrabold px-3 py-2 rounded-xl bg-amber-500 text-amber-950 hover:bg-amber-400 transition-all"
+                          >
+                            + Registrar Ponto de Hoje
+                          </button>
+                        </div>
+
+                        {(() => {
+                          const sorted = [...progressSnapshots].sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+                          const latest = sorted[sorted.length - 1];
+                          const diff = latest ? latest.financial_progress - latest.physical_progress : null;
+                          const chartData = sorted.map((s) => ({
+                            data: new Date(s.snapshot_date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+                            'Progresso Físico (%)': s.physical_progress,
+                            'Progresso Financeiro (%)': s.financial_progress,
+                          }));
+                          return (
+                            <>
+                              {diff !== null && (
+                                <div
+                                  className={`p-3.5 rounded-2xl border text-xs font-semibold ${
+                                    diff > 10
+                                      ? 'bg-rose-500/10 border-rose-500/30 text-rose-200'
+                                      : diff > 0
+                                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                                      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                                  }`}
+                                >
+                                  {diff > 10 &&
+                                    `Atenção: a obra já gastou ${diff.toFixed(1)} pontos percentuais a mais do orçamento do que avançou fisicamente.`}
+                                  {diff > 0 && diff <= 10 && `A obra está gastando um pouco mais rápido (${diff.toFixed(1)} p.p.) do que constrói.`}
+                                  {diff <= 0 && `Positivo: a obra está construindo mais rápido (${Math.abs(diff).toFixed(1)} p.p.) do que está gastando do orçamento.`}
+                                </div>
+                              )}
+                              {chartData.length === 0 ? (
+                                <p className="text-sm text-slate-400 text-center py-8">
+                                  Nenhum ponto registrado ainda. Clique em "Registrar Ponto de Hoje" (o ideal é uma vez por mês) para começar a montar a curva desta obra.
+                                </p>
+                              ) : (
+                                <div className="w-full h-64">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={chartData} margin={{ top: 5, right: 8, left: -20, bottom: 0 }}>
+                                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                      <XAxis dataKey="data" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                                      <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} unit="%" />
+                                      <Tooltip
+                                        formatter={(v: number) => `${v.toFixed(1)}%`}
+                                        contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
+                                      />
+                                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                                      <Line type="monotone" dataKey="Progresso Físico (%)" stroke="#38bdf8" strokeWidth={2} dot={{ r: 3 }} />
+                                      <Line type="monotone" dataKey="Progresso Financeiro (%)" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                                    </LineChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              )}
+                              <p className="text-[11px] text-slate-500 leading-relaxed">
+                                Progresso Físico = % de avanço da obra. Progresso Financeiro = % do orçamento total já gasto (categorias + pagamentos pagos).
+                              </p>
+                            </>
+                          );
+                        })()}
                       </div>
 
                       <div className="space-y-2">
