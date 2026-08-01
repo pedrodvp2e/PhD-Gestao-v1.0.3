@@ -17,7 +17,10 @@
     "motion": "^12.43.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "react-router-dom": "^6.28.0"
+    "react-router-dom": "^6.28.0",
+    "jspdf": "^2.5.2",
+    "html2canvas-pro": "^1.5.8",
+    "recharts": "^2.15.1"
   },
   "devDependencies": {
     "@types/react": "^19.0.8",

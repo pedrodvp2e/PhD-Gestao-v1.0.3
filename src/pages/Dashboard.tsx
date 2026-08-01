@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Lock,
@@ -27,7 +27,18 @@ import {
   UserPlus,
   Search,
   Loader2,
+  LogOut,
+  Trash2,
+  Pencil,
+  Copy,
+  Check,
+  UserCircle,
+  Camera,
+  Calendar,
 } from 'lucide-react';
+import { shareElementAsImage } from '@/lib/shareReport';
+import { shareElementAsPdf } from '@/lib/sharePdfReport';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import NavBar from '@/components/NavBar';
@@ -50,6 +61,14 @@ type Project = {
   start_date: string | null;
   deadline: string | null;
   progress: number | null;
+  built_area_m2?: number | null;
+};
+
+type ProgressSnapshot = {
+  id: string;
+  snapshot_date: string;
+  physical_progress: number;
+  financial_progress: number;
 };
 
 type Task = {
@@ -188,6 +207,7 @@ const TABS = [
   { id: 'os', label: 'Ordens de Serviço', icon: FileText, premium: false },
   { id: 'chat', label: 'Chat da Obra', icon: MessageSquare, premium: false },
   { id: 'financeiro', label: 'Financeiro', icon: Wallet, premium: true },
+  { id: 'perfil', label: 'Perfil', icon: UserCircle, premium: false },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -288,7 +308,7 @@ const MOCK_PAYMENTS: Payment[] = [
 ];
 
 export default function Dashboard() {
-  const { profile, isPremium, user } = useAuth();
+  const { profile, isPremium, user, signOut, deleteAccount, refreshProfile } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -301,6 +321,7 @@ export default function Dashboard() {
   const [diary, setDiary] = useState<DiaryEntry[]>([]);
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
   const [stockSnapshots, setStockSnapshots] = useState<MaterialStockSnapshot[]>([]);
+  const [progressSnapshots, setProgressSnapshots] = useState<ProgressSnapshot[]>([]);
   const [safetyItems, setSafetyItems] = useState<SafetyItem[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
@@ -316,6 +337,8 @@ export default function Dashboard() {
 
   // Modais de criação/edição (uma função pra cada, igual ao app mobile)
   const [showNewProject, setShowNewProject] = useState(false);
+  const [showEditProject, setShowEditProject] = useState(false);
+  const [showDeleteProjectConfirm, setShowDeleteProjectConfirm] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
   const [showNewDiary, setShowNewDiary] = useState(false);
   const [showNewMaterial, setShowNewMaterial] = useState(false);
@@ -325,6 +348,9 @@ export default function Dashboard() {
   const [showNewBudgetItem, setShowNewBudgetItem] = useState(false);
   const [showNewCashFlow, setShowNewCashFlow] = useState(false);
   const [showNewPayment, setShowNewPayment] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const reportCardRef = useRef<HTMLDivElement>(null);
+  const [sharingReport, setSharingReport] = useState<'image' | 'pdf' | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -347,6 +373,10 @@ export default function Dashboard() {
     action_taken: '',
   });
   const [memberSearch, setMemberSearch] = useState('');
+  const [inviteMode, setInviteMode] = useState<'existing' | 'new'>('existing');
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [profileForm, setProfileForm] = useState({ full_name: '', phone: '' });
+  const [profileSaved, setProfileSaved] = useState(false);
   const [foundMember, setFoundMember] = useState<{ id: string; full_name: string; role: string; member_code: string } | null>(null);
   const [memberSearchError, setMemberSearchError] = useState('');
   const [osForm, setOsForm] = useState({
@@ -374,7 +404,7 @@ export default function Dashboard() {
       try {
         const { data, error } = await supabase
           .from('projects')
-          .select('id, name, client_name, address, status, start_date, deadline, progress')
+          .select('id, name, client_name, address, status, start_date, deadline, progress, built_area_m2')
           .order('created_at', { ascending: false });
         if (!error && data && data.length > 0) {
           loadedProjects = data as Project[];
@@ -398,6 +428,45 @@ export default function Dashboard() {
     setTabLoading(true);
     (async () => {
       switch (tab) {
+        case 'visao': {
+          let mats: MaterialRow[] = [];
+          let memList: MemberRow[] = [];
+          let bList: BudgetItem[] = [];
+          let cfList: CashFlowEntry[] = [];
+          let payList: Payment[] = [];
+          let snapList: ProgressSnapshot[] = [];
+          let taskList: Task[] = [];
+          let incList: Incident[] = [];
+          try {
+            const [{ data: mRes }, { data: memRes }, { data: b }, { data: cf }, { data: pay }, { data: snaps }, { data: tRes }, { data: incRes }] = await Promise.all([
+              supabase.from('materials').select('id, name, unit, needed_quantity, acquired_quantity, notes').eq('project_id', selectedId),
+              supabase.from('project_members').select('id, project_role, profiles ( full_name, phone, member_code )').eq('project_id', selectedId),
+              supabase.from('budget_items').select('id, category, planned_value, actual_value').eq('project_id', selectedId),
+              supabase.from('cash_flow').select('id, entry_date, type, description, amount').eq('project_id', selectedId).order('entry_date', { ascending: false }),
+              supabase.from('payments').select('id, payee_name, payee_type, amount, due_date, paid_date, status').eq('project_id', selectedId),
+              supabase.from('progress_snapshots').select('id, snapshot_date, physical_progress, financial_progress').eq('project_id', selectedId).order('snapshot_date', { ascending: true }),
+              supabase.from('tasks').select('id, title, category, status, progress, deadline').eq('project_id', selectedId),
+              supabase.from('incidents').select('id, occurred_at, type, severity, description, injured_person, action_taken').eq('project_id', selectedId).order('occurred_at', { ascending: false }),
+            ]);
+            if (mRes && mRes.length > 0) mats = mRes as MaterialRow[];
+            if (memRes && memRes.length > 0) memList = memRes as unknown as MemberRow[];
+            if (b && b.length > 0) bList = b as BudgetItem[];
+            if (cf && cf.length > 0) cfList = cf as CashFlowEntry[];
+            if (pay && pay.length > 0) payList = pay as Payment[];
+            if (snaps && snaps.length > 0) snapList = snaps as ProgressSnapshot[];
+            if (tRes && tRes.length > 0) taskList = tRes as Task[];
+            if (incRes && incRes.length > 0) incList = incRes as Incident[];
+          } catch {}
+          setMaterials(mats.length > 0 ? mats : MOCK_MATERIALS);
+          setMembers(memList.length > 0 ? memList : MOCK_MEMBERS);
+          setBudget(bList.length > 0 ? bList : MOCK_BUDGET);
+          setCashFlow(cfList.length > 0 ? cfList : MOCK_CASH_FLOW);
+          setPayments(payList.length > 0 ? payList : MOCK_PAYMENTS);
+          setProgressSnapshots(snapList);
+          setTasks(taskList.length > 0 ? taskList : MOCK_TASKS);
+          setIncidents(incList.length > 0 ? incList : []);
+          break;
+        }
         case 'cronograma': {
           let list: Task[] = [];
           try {
@@ -554,6 +623,10 @@ export default function Dashboard() {
   );
 
   const currency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  useEffect(() => {
+    if (profile) setProfileForm({ full_name: profile.full_name || '', phone: profile.phone || '' });
+  }, [profile?.id]);
 
   // ==========================================
   // HANDLERS: CRIAÇÃO / EDIÇÃO (espelham o app mobile)
@@ -896,6 +969,159 @@ export default function Dashboard() {
     }
   };
 
+  const handleEditProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!projectForm.name.trim() || !selectedId) return;
+    setFormLoading(true);
+    setFormError('');
+    try {
+      const patch = {
+        name: projectForm.name.trim(),
+        client_name: projectForm.client_name.trim() || null,
+        address: projectForm.address.trim() || null,
+        deadline: projectForm.deadline || null,
+      };
+      const { error } = await supabase.from('projects').update(patch).eq('id', selectedId);
+      if (error) throw new Error(error.message);
+      setProjects((prev) => prev.map((p) => (p.id === selectedId ? { ...p, ...patch } : p)));
+      setShowEditProject(false);
+    } catch (err: any) {
+      setFormError(err?.message || 'Erro ao editar a obra.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!selectedId) return;
+    setFormLoading(true);
+    setFormError('');
+    try {
+      const { error } = await supabase.from('projects').delete().eq('id', selectedId);
+      if (error) throw new Error(error.message);
+      setProjects((prev) => prev.filter((p) => p.id !== selectedId));
+      setSelectedId(null);
+      setShowDeleteProjectConfirm(false);
+    } catch (err: any) {
+      setFormError(err?.message || 'Não foi possível excluir a obra.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleCopyMemberCode = () => {
+    if (!profile?.member_code) return;
+    navigator.clipboard?.writeText(profile.member_code);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setFormLoading(true);
+    setFormError('');
+    setProfileSaved(false);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ full_name: profileForm.full_name.trim() || null, phone: profileForm.phone.trim() || null })
+        .eq('id', user.id);
+      if (error) throw new Error(error.message);
+      await refreshProfile();
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 2500);
+    } catch (err: any) {
+      setFormError(err?.message || 'Erro ao salvar o perfil.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const taskStats = {
+    done: tasks.filter((t) => t.status === 'concluido').length,
+    doing: tasks.filter((t) => t.status === 'em_andamento').length,
+    pending: tasks.filter((t) => t.status === 'pendente').length,
+  };
+
+  const handleUpdateProjectArea = async (value: number | null) => {
+    if (!selectedId) return;
+    setProjects((prev) => prev.map((p) => (p.id === selectedId ? { ...p, built_area_m2: value } : p)));
+    await supabase.from('projects').update({ built_area_m2: value }).eq('id', selectedId);
+  };
+
+  const handleRecordProgressSnapshot = async () => {
+    if (!selectedId || !selectedProject) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const totalPaidPayments = payments
+      .filter((p) => p.status?.toLowerCase() === 'pago')
+      .reduce((s, p) => s + (p.amount || 0), 0);
+    const totalGasto = totalActual + totalPaidPayments;
+    const financialProgress = totalPlanned > 0 ? Math.min(999, (totalGasto / totalPlanned) * 100) : 0;
+    const physicalProgress = selectedProject.progress || 0;
+
+    const payload = {
+      project_id: selectedId,
+      snapshot_date: today,
+      physical_progress: Math.round(physicalProgress * 100) / 100,
+      financial_progress: Math.round(financialProgress * 100) / 100,
+      created_by: profile?.id || null,
+    };
+
+    const { error } = await supabase.from('progress_snapshots').upsert(payload, { onConflict: 'project_id,snapshot_date' });
+    if (error) {
+      setFormError(error.message);
+      return;
+    }
+    const { data } = await supabase
+      .from('progress_snapshots')
+      .select('id, snapshot_date, physical_progress, financial_progress')
+      .eq('project_id', selectedId)
+      .order('snapshot_date', { ascending: true });
+    if (data) setProgressSnapshots(data as ProgressSnapshot[]);
+  };
+
+  const handleShareReport = async (kind: 'image' | 'pdf') => {
+    if (sharingReport || !selectedProject) return;
+    setSharingReport(kind);
+    try {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      if (!reportCardRef.current) throw new Error('Não foi possível preparar o relatório.');
+      const slug = selectedProject.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      if (kind === 'image') {
+        await shareElementAsImage(
+          reportCardRef.current,
+          `relatorio-${slug}-${Date.now()}.png`,
+          `Relatório - ${selectedProject.name}`,
+          `Relatório da obra "${selectedProject.name}" gerado pelo PHD Gestões.`
+        );
+      } else {
+        const monthLabel = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        await shareElementAsPdf(
+          reportCardRef.current,
+          `relatorio-mensal-${slug}-${Date.now()}.pdf`,
+          `Relatório Mensal - ${selectedProject.name}`,
+          `Relatório mensal (${monthLabel}) da obra "${selectedProject.name}" gerado pelo PHD Gestões.`
+        );
+      }
+    } catch (err: any) {
+      setFormError(err?.message || 'Erro ao gerar o relatório.');
+    } finally {
+      setSharingReport(null);
+    }
+  };
+
+  const handleDeleteAccountConfirm = async () => {
+    setFormLoading(true);
+    setFormError('');
+    const { error } = await deleteAccount();
+    if (error) {
+      setFormError(error);
+      setFormLoading(false);
+    }
+    // Em caso de sucesso a sessão já é encerrada e a tela de login assume sozinha.
+  };
+
   return (
     <div className="min-h-screen bg-[#070d19] text-slate-100 font-sans relative overflow-hidden flex flex-col">
       <GlobalBackground />
@@ -1028,6 +1254,46 @@ export default function Dashboard() {
                             {selectedProject.client_name} — {selectedProject.address}
                           </p>
                         </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setProjectForm({
+                                name: selectedProject.name,
+                                client_name: selectedProject.client_name || '',
+                                address: selectedProject.address || '',
+                                deadline: selectedProject.deadline || '',
+                              });
+                              setShowEditProject(true);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white text-xs font-bold hover:bg-white/20 transition-all"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Editar</span>
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteProjectConfirm(true)}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-bold hover:bg-rose-500/20 transition-all"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Excluir</span>
+                          </button>
+                          <button
+                            onClick={() => handleShareReport('image')}
+                            disabled={sharingReport !== null}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-bold hover:bg-cyan-500/20 disabled:opacity-60 transition-all"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>{sharingReport === 'image' ? 'Gerando…' : 'Relatório (Imagem)'}</span>
+                          </button>
+                          <button
+                            onClick={() => handleShareReport('pdf')}
+                            disabled={sharingReport !== null}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-bold hover:bg-cyan-500/20 disabled:opacity-60 transition-all"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>{sharingReport === 'pdf' ? 'Gerando…' : 'Relatório Mensal (PDF)'}</span>
+                          </button>
+                        </div>
                         <span className="self-start sm:self-auto px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-mono text-xs font-bold uppercase">
                           {selectedProject.status}
                         </span>
@@ -1074,10 +1340,194 @@ export default function Dashboard() {
                         </div>
                       )}
                     </div>
+
+                    {/* Custo por m² Construído */}
+                    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
+                      <h3 className="text-lg font-bold text-white">Custo por m² Construído</h3>
+                      <div className="flex flex-wrap items-end gap-3">
+                        <div className="space-y-1">
+                          <label className={labelClass}>Área construída (m²)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            defaultValue={selectedProject.built_area_m2 ?? ''}
+                            onBlur={(e) => handleUpdateProjectArea(e.target.value ? Number(e.target.value) : null)}
+                            placeholder="Ex: 250"
+                            className={`${inputClass} w-40`}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-[180px] p-4 rounded-2xl bg-white/5 border border-white/10">
+                          <span className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Custo por m²</span>
+                          <span className="text-lg font-bold text-white font-mono">
+                            {selectedProject.built_area_m2 && selectedProject.built_area_m2 > 0
+                              ? currency(
+                                  (totalActual + payments.filter((p) => p.status?.toLowerCase() === 'pago').reduce((s, p) => s + (p.amount || 0), 0)) /
+                                    selectedProject.built_area_m2
+                                )
+                              : '— informe a área'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Curva S: Físico x Financeiro */}
+                    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="text-lg font-bold text-white">Curva S: Físico x Financeiro</h3>
+                        <button
+                          onClick={handleRecordProgressSnapshot}
+                          className="text-xs font-extrabold px-3 py-2 rounded-xl bg-amber-500 text-amber-950 hover:bg-amber-400 transition-all"
+                        >
+                          + Registrar Ponto de Hoje
+                        </button>
+                      </div>
+
+                      {(() => {
+                        const sorted = [...progressSnapshots].sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+                        const latest = sorted[sorted.length - 1];
+                        const diff = latest ? latest.financial_progress - latest.physical_progress : null;
+                        const chartData = sorted.map((s) => ({
+                          data: new Date(s.snapshot_date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+                          'Progresso Físico (%)': s.physical_progress,
+                          'Progresso Financeiro (%)': s.financial_progress,
+                        }));
+                        return (
+                          <>
+                            {diff !== null && (
+                              <div
+                                className={`p-3.5 rounded-2xl border text-xs font-semibold ${
+                                  diff > 10
+                                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-200'
+                                    : diff > 0
+                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                                }`}
+                              >
+                                {diff > 10 &&
+                                  `Atenção: a obra já gastou ${diff.toFixed(1)} pontos percentuais a mais do orçamento do que avançou fisicamente.`}
+                                {diff > 0 && diff <= 10 && `A obra está gastando um pouco mais rápido (${diff.toFixed(1)} p.p.) do que constrói.`}
+                                {diff <= 0 && `Positivo: a obra está construindo mais rápido (${Math.abs(diff).toFixed(1)} p.p.) do que está gastando do orçamento.`}
+                              </div>
+                            )}
+                            {chartData.length === 0 ? (
+                              <p className="text-sm text-slate-400 text-center py-8">
+                                Nenhum ponto registrado ainda. Clique em "Registrar Ponto de Hoje" (o ideal é uma vez por mês) para começar a montar a curva desta obra.
+                              </p>
+                            ) : (
+                              <div className="w-full h-64">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <LineChart data={chartData} margin={{ top: 5, right: 8, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                    <XAxis dataKey="data" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                                    <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} unit="%" />
+                                    <Tooltip
+                                      formatter={(v: number) => `${v.toFixed(1)}%`}
+                                      contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
+                                    />
+                                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                                    <Line type="monotone" dataKey="Progresso Físico (%)" stroke="#38bdf8" strokeWidth={2} dot={{ r: 3 }} />
+                                    <Line type="monotone" dataKey="Progresso Financeiro (%)" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                                  </LineChart>
+                                </ResponsiveContainer>
+                              </div>
+                            )}
+                            <p className="text-[11px] text-slate-500 leading-relaxed">
+                              Progresso Físico = % de avanço da obra. Progresso Financeiro = % do orçamento total já gasto (categorias + pagamentos pagos).
+                            </p>
+                          </>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Suprimentos Críticos, Avisos e Equipe */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-xl space-y-3">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                          <h4 className="text-sm font-bold text-white uppercase tracking-wider">Suprimentos Críticos</h4>
+                          <button onClick={() => setTab('materiais')} className="text-xs font-bold text-signal-400 hover:underline">
+                            Ver Todos
+                          </button>
+                        </div>
+                        {materials.length === 0 ? (
+                          <p className="text-xs text-slate-400 text-center py-4">Nenhum suprimento cadastrado.</p>
+                        ) : (
+                          materials.slice(0, 3).map((m) => {
+                            const isCritical = m.acquired_quantity / m.needed_quantity < 0.3;
+                            return (
+                              <div key={m.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                                <div>
+                                  <span className="text-xs font-bold text-white block">{m.name}</span>
+                                  <span className="text-[10px] text-slate-400">
+                                    Necessário: {m.needed_quantity} {m.unit} · Adquirido: {m.acquired_quantity} {m.unit}
+                                  </span>
+                                </div>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    isCritical ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'
+                                  }`}
+                                >
+                                  {isCritical ? '⚠️ Baixo' : '✓ OK'}
+                                </span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-xl space-y-3">
+                          <h4 className="text-sm font-bold text-white uppercase tracking-wider border-b border-white/10 pb-3">Avisos e Boletins</h4>
+                          {(() => {
+                            const overdue = tasks.filter((t) => t.status !== 'concluido' && t.deadline && new Date(t.deadline).getTime() < Date.now());
+                            const graveIncidents = incidents.filter((i) => i.severity === 'grave');
+                            const avisos = [
+                              ...overdue.map((t) => ({ id: `t-${t.id}`, title: 'Tarefa atrasada', message: t.title })),
+                              ...graveIncidents.map((i) => ({ id: `i-${i.id}`, title: 'Ocorrência grave', message: i.description })),
+                            ].slice(0, 3);
+                            return avisos.length === 0 ? (
+                              <p className="text-xs text-slate-400 text-center py-4">Sem avisos urgentes pendentes de solução.</p>
+                            ) : (
+                              avisos.map((a) => (
+                                <div key={a.id} className="p-3 rounded-xl bg-white/5 border border-white/10 flex gap-2">
+                                  <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                                  <div>
+                                    <span className="text-xs font-bold text-white block">{a.title}</span>
+                                    <p className="text-[10px] text-slate-400">{a.message}</p>
+                                  </div>
+                                </div>
+                              ))
+                            );
+                          })()}
+                        </div>
+
+                        <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-xl space-y-3">
+                          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                            <h4 className="text-sm font-bold text-white uppercase tracking-wider">Equipe de Canto</h4>
+                            <button onClick={() => setTab('equipe')} className="text-xs font-bold text-signal-400 hover:underline">
+                              Ver Lista
+                            </button>
+                          </div>
+                          {members.length === 0 ? (
+                            <p className="text-xs text-slate-400 text-center py-4">Nenhum colaborador nesta obra.</p>
+                          ) : (
+                            members.slice(0, 3).map((m) => (
+                              <div key={m.id} className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-signal-500/20 border border-signal-500/30 flex items-center justify-center text-xs font-bold text-signal-300">
+                                  {(m.profiles?.full_name || '?').charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <span className="text-xs font-bold text-white block leading-tight">{m.profiles?.full_name}</span>
+                                  <span className="text-[10px] text-slate-400 uppercase font-semibold">{m.project_role}</span>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
-
-                {/* TAB CONTENT: CRONOGRAMA */}
                 {tab === 'cronograma' && (
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-4">
                     <div className="flex items-center justify-between">
@@ -1490,6 +1940,84 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
+
+                {/* TAB CONTENT: PERFIL */}
+                {tab === 'perfil' && (
+                  <div className="space-y-6">
+                    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-signal-500 to-orange-500 flex items-center justify-center text-2xl font-extrabold text-white shrink-0">
+                          {(profile?.full_name || user?.email || '?').charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-extrabold text-white">{profile?.full_name || 'Sem nome'}</h3>
+                          <p className="text-xs font-mono text-slate-400 uppercase">Função ativa: {profile?.role || '—'}</p>
+                        </div>
+                      </div>
+
+                      {profile?.member_code && (
+                        <div className="p-5 rounded-2xl bg-signal-500/10 border border-signal-500/20 space-y-2">
+                          <span className="text-xs font-mono font-bold text-signal-300 uppercase">Seu Código de Membro</span>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-2xl font-extrabold text-white font-mono">{profile.member_code}</span>
+                            <button
+                              onClick={handleCopyMemberCode}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white text-xs font-bold hover:bg-white/20 transition-all"
+                            >
+                              {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedCode ? 'Copiado!' : 'Copiar'}</span>
+                            </button>
+                          </div>
+                          <p className="text-xs text-slate-400">
+                            Compartilhe este código (ou seu telefone) com o responsável da obra para ser adicionado à equipe.
+                          </p>
+                        </div>
+                      )}
+
+                      <form onSubmit={handleSaveProfile} className="space-y-4">
+                        {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+                        <div className="space-y-1">
+                          <label className={labelClass}>Nome Completo</label>
+                          <input value={profileForm.full_name} onChange={(e) => setProfileForm({ ...profileForm, full_name: e.target.value })} className={inputClass} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className={labelClass}>E-mail de Trabalho</label>
+                            <input disabled value={user?.email || ''} className={`${inputClass} opacity-60 cursor-not-allowed`} />
+                          </div>
+                          <div className="space-y-1">
+                            <label className={labelClass}>Telefone de Contato</label>
+                            <input value={profileForm.phone} onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })} className={inputClass} placeholder="(11) 99999-9999" />
+                          </div>
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={formLoading}
+                          className="w-full py-3 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 text-white font-extrabold text-sm transition-all"
+                        >
+                          {profileSaved ? 'Perfil Salvo!' : formLoading ? 'Salvando…' : 'Salvar Alterações'}
+                        </button>
+                      </form>
+                    </div>
+
+                    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-3">
+                      <button
+                        onClick={() => signOut()}
+                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 font-bold text-sm hover:bg-rose-500/20 transition-all"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Encerrar Sessão</span>
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteAccount(true)}
+                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-rose-500/30 text-rose-400 font-bold text-sm hover:bg-rose-500/10 transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Excluir Conta</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </main>
@@ -1520,6 +2048,85 @@ export default function Dashboard() {
             </div>
             <SubmitButton loading={formLoading}>Criar Obra</SubmitButton>
           </form>
+        </Modal>
+      )}
+
+      {showEditProject && (
+        <Modal title="Editar Obra" onClose={() => setShowEditProject(false)}>
+          <form onSubmit={handleEditProject} className="space-y-4">
+            {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+            <div className="space-y-1">
+              <label className={labelClass}>Nome da Obra</label>
+              <input required value={projectForm.name} onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })} className={inputClass} />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Cliente</label>
+              <input value={projectForm.client_name} onChange={(e) => setProjectForm({ ...projectForm, client_name: e.target.value })} className={inputClass} />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Endereço</label>
+              <input value={projectForm.address} onChange={(e) => setProjectForm({ ...projectForm, address: e.target.value })} className={inputClass} />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Prazo Final</label>
+              <input type="date" value={projectForm.deadline} onChange={(e) => setProjectForm({ ...projectForm, deadline: e.target.value })} className={inputClass} />
+            </div>
+            <SubmitButton loading={formLoading}>Salvar Alterações</SubmitButton>
+          </form>
+        </Modal>
+      )}
+
+      {showDeleteProjectConfirm && (
+        <Modal title="Excluir Obra" onClose={() => setShowDeleteProjectConfirm(false)}>
+          <div className="space-y-4">
+            {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+            <p className="text-sm text-slate-300">
+              Tem certeza que deseja excluir <strong className="text-white">{selectedProject?.name}</strong>? Todos os
+              dados desta obra (cronograma, materiais, financeiro, chat) serão apagados permanentemente.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteProjectConfirm(false)}
+                className="flex-1 py-3 rounded-xl bg-white/10 border border-white/10 text-white text-sm font-bold hover:bg-white/20 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteProject}
+                disabled={formLoading}
+                className="flex-1 py-3 rounded-xl bg-rose-500 hover:bg-rose-400 disabled:opacity-60 text-white text-sm font-extrabold transition-all"
+              >
+                {formLoading ? 'Excluindo…' : 'Excluir Definitivamente'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {showDeleteAccount && (
+        <Modal title="Excluir Conta" onClose={() => setShowDeleteAccount(false)}>
+          <div className="space-y-4">
+            {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
+            <p className="text-sm text-slate-300">
+              Esta ação é <strong className="text-rose-300">permanente</strong>. Sua conta, perfil e acesso às obras
+              serão apagados e não podem ser recuperados.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteAccount(false)}
+                className="flex-1 py-3 rounded-xl bg-white/10 border border-white/10 text-white text-sm font-bold hover:bg-white/20 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteAccountConfirm}
+                disabled={formLoading}
+                className="flex-1 py-3 rounded-xl bg-rose-500 hover:bg-rose-400 disabled:opacity-60 text-white text-sm font-extrabold transition-all"
+              >
+                {formLoading ? 'Excluindo…' : 'Excluir Minha Conta'}
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
 
@@ -1670,32 +2277,64 @@ export default function Dashboard() {
         >
           <div className="space-y-4">
             {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">{formError}</div>}
-            <form onSubmit={handleSearchMember} className="flex items-center gap-2">
-              <input
-                value={memberSearch}
-                onChange={(e) => setMemberSearch(e.target.value)}
-                className={inputClass}
-                placeholder="Código do colaborador ou telefone"
-              />
-              <button type="submit" disabled={formLoading} className="shrink-0 p-3 rounded-xl bg-white/10 border border-white/10 text-white hover:bg-white/20 transition-all">
-                <Search className="w-4 h-4" />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setInviteMode('existing')}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  inviteMode === 'existing' ? 'bg-signal-500 text-white' : 'bg-white/5 border border-white/10 text-slate-300'
+                }`}
+              >
+                Já Tem Conta
               </button>
-            </form>
-            {memberSearchError && <p className="text-xs text-rose-300">{memberSearchError}</p>}
-            {foundMember && (
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-bold text-white text-sm">{foundMember.full_name}</p>
-                  <p className="text-xs text-slate-400 font-mono">{foundMember.role} · {foundMember.member_code}</p>
-                </div>
-                <button
-                  onClick={handleInviteMember}
-                  disabled={formLoading}
-                  className="px-4 py-2 rounded-xl bg-signal-500 hover:bg-signal-400 text-white text-xs font-extrabold transition-all"
-                >
-                  Adicionar à Obra
-                </button>
+              <button
+                type="button"
+                onClick={() => setInviteMode('new')}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  inviteMode === 'new' ? 'bg-signal-500 text-white' : 'bg-white/5 border border-white/10 text-slate-300'
+                }`}
+              >
+                Novo Funcionário
+              </button>
+            </div>
+
+            {inviteMode === 'new' ? (
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs leading-relaxed">
+                Cada profissional precisa criar a própria conta (cadastro com e-mail e senha) antes de poder ser
+                adicionado à equipe, já que o perfil fica vinculado ao login dele. Peça para a pessoa se cadastrar
+                no site ou no app e depois use a opção <strong>"Já Tem Conta"</strong> com o código PHD ou telefone
+                dela.
               </div>
+            ) : (
+              <>
+                <form onSubmit={handleSearchMember} className="flex items-center gap-2">
+                  <input
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                    className={inputClass}
+                    placeholder="Código PHD (ex: PHD-0001) ou telefone"
+                  />
+                  <button type="submit" disabled={formLoading} className="shrink-0 p-3 rounded-xl bg-white/10 border border-white/10 text-white hover:bg-white/20 transition-all">
+                    <Search className="w-4 h-4" />
+                  </button>
+                </form>
+                {memberSearchError && <p className="text-xs text-rose-300">{memberSearchError}</p>}
+                {foundMember && (
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-white text-sm">{foundMember.full_name}</p>
+                      <p className="text-xs text-slate-400 font-mono">{foundMember.role} · {foundMember.member_code}</p>
+                    </div>
+                    <button
+                      onClick={handleInviteMember}
+                      disabled={formLoading}
+                      className="px-4 py-2 rounded-xl bg-signal-500 hover:bg-signal-400 text-white text-xs font-extrabold transition-all"
+                    >
+                      Adicionar à Obra
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </Modal>
@@ -1822,6 +2461,99 @@ export default function Dashboard() {
             <SubmitButton loading={formLoading}>Registrar Pagamento</SubmitButton>
           </form>
         </Modal>
+      )}
+
+      {/* Card de relatório — renderizado fora da tela, capturado pelo html2canvas para gerar imagem/PDF */}
+      {selectedProject && (
+        <div className="fixed -left-[9999px] top-0" aria-hidden="true">
+          <div ref={reportCardRef} className="bg-white p-10 w-[800px]" style={{ fontFamily: 'inherit' }}>
+            <div className="flex items-center justify-between border-b-4 border-blue-600 pb-5 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="h-14 w-14 rounded-2xl bg-blue-600 flex items-center justify-center shrink-0">
+                  <Building2 size={30} className="text-white" strokeWidth={2.2} />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900 leading-tight">PHD Gestões</h1>
+                  <p className="text-xs text-slate-500 font-semibold">Relatório de Obra</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] text-slate-400 font-semibold">Gerado em</p>
+                <p className="text-xs font-bold text-slate-800">
+                  {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-xl font-bold text-slate-900">{selectedProject.name}</h2>
+                <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-100 text-blue-700">
+                  {selectedProject.status}
+                </span>
+              </div>
+              <p className="text-sm text-slate-600">Cliente: {selectedProject.client_name || 'Particular'}</p>
+              {selectedProject.address && <p className="text-sm text-slate-600">{selectedProject.address}</p>}
+              {profile?.full_name && (
+                <p className="text-sm text-slate-600">
+                  Responsável: <span className="font-semibold text-slate-800">{profile.full_name}</span>
+                  {profile.role && <span className="text-slate-400"> ({profile.role})</span>}
+                </p>
+              )}
+            </div>
+
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Progresso Geral</span>
+                <span className="text-lg font-bold text-blue-600">{selectedProject.progress ?? 0}%</span>
+              </div>
+              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                <div className="h-full bg-blue-600 rounded-full" style={{ width: `${selectedProject.progress ?? 0}%` }} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-3 mb-6">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
+                <p className="text-lg font-bold text-blue-600">{taskStats.done}</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Entregues</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
+                <p className="text-lg font-bold text-amber-500">{taskStats.doing}</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Executando</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
+                <p className="text-lg font-bold text-slate-600">{taskStats.pending}</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Planejados</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
+                <p className="text-lg font-bold text-slate-800">
+                  {selectedProject.deadline
+                    ? Math.abs(Math.round((new Date(selectedProject.deadline).getTime() - Date.now()) / 86400000))
+                    : '—'}
+                </p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase">
+                  {selectedProject.deadline && new Date(selectedProject.deadline).getTime() < Date.now() ? 'Dias de Atraso' : 'Dias Restantes'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 mb-2 text-xs text-slate-600 font-semibold">
+              <Calendar size={14} />
+              Prazo final: {selectedProject.deadline ? new Date(selectedProject.deadline).toLocaleDateString('pt-BR') : 'Não definido'}
+            </div>
+
+            {isPremium && (
+              <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold">
+                <Wallet size={14} />
+                Orçamento: {currency(totalPlanned)} planejado · {currency(totalActual)} executado
+              </div>
+            )}
+
+            <div className="mt-8 pt-4 border-t border-slate-200 text-center text-[10px] text-slate-400">
+              Relatório gerado automaticamente pelo painel web PHD Gestões
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

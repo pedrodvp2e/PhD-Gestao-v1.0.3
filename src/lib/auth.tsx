@@ -6,6 +6,9 @@ export type Profile = {
   id: string;
   full_name: string | null;
   role: string | null;
+  phone: string | null;
+  avatar_url: string | null;
+  member_code: string | null;
   premium_status: 'free' | 'premium';
   premium_expires_at: string | null;
 };
@@ -18,8 +21,10 @@ type AuthContextValue = {
   isPremium: boolean;
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  deleteAccount: () => Promise<{ error: string | null }>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -32,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, role, premium_status, premium_expires_at')
+      .select('id, full_name, role, phone, avatar_url, member_code, premium_status, premium_expires_at')
       .eq('id', userId)
       .single();
     if (!error && data) setProfile(data as Profile);
@@ -86,8 +91,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   };
 
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    return { error: error?.message ?? null };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
+  };
+
+  const deleteAccount = async () => {
+    const { error } = await supabase.rpc('delete_own_account');
+    if (error) return { error: error.message };
+    await supabase.auth.signOut();
+    setSession(null);
+    setProfile(null);
+    return { error: null };
   };
 
   // Conta com acesso Premium ilimitado garantido, independente do que estiver no banco.
@@ -111,7 +133,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isPremium: Boolean(isPremium),
         signInWithPassword,
         signUp,
+        signInWithGoogle,
         signOut,
+        deleteAccount,
         refreshProfile: async () => {
           if (session?.user) await loadProfile(session.user.id);
         },
